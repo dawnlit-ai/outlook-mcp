@@ -1,0 +1,60 @@
+{
+  "name": "@dawnlit/outlook-mcp",
+  "version": "0.1.0",
+  "description": "MCP tools exposing @dawnlit/outlook-bridge's Outlook automation — read, send, reply, file, and template mail — to any MCP host.",
+  "license": "Apache-2.0",
+  "author": "Dawnlit",
+  "homepage": "https://github.com/dawnlit-ai/outlook-mcp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dawnlit-ai/outlook-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dawnlit-ai/outlook-mcp/issues"
+  },
+  "keywords": [
+    "outlook",
+    "email",
+    "mcp",
+    "model-context-protocol",
+    "automation"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "npm run build && node --test \"test/*.test.js\"",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "@dawnlit/outlook-bridge": "^1.0.0",
+    "exceljs": "^4.4.0",
+    "pdf-parse": "^2.4.5"
+  },
+  "peerDependencies": {
+    "@modelcontextprotocol/sdk": ">=1.0.0",
+    "zod": "^3.25 || ^4.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@types/node": "^24.0.0",
+    "typescript": "~6.0.3",
+    "zod": "^4.4.3"
+  }
+}
