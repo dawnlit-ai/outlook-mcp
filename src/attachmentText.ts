@@ -1,32 +1,50 @@
-// Best-effort text extraction for an attachment already saved to disk — the
-// generic half of "open this Outlook attachment and read it": PDF, Excel
-// (.xlsx), and plain-text/CSV. Images have no extractable text; anything else
-// is reported unhandled rather than guessed at.
+// Best-effort attachment reading for an attachment already saved to disk —
+// the generic half of "open this Outlook attachment and read it": text
+// extraction from PDF, Excel (.xlsx), and plain-text/CSV; raw base64 passthrough
+// for images, so the MCP client can hand them to the model as native vision
+// input instead of us guessing at their contents. Anything else is reported
+// unhandled rather than guessed at.
 import fs from 'fs';
 import path from 'path';
 import { PDFParse } from 'pdf-parse';
 import ExcelJS from 'exceljs';
 
-const IMAGE_EXTS = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tif', '.tiff', '.webp', '.heic'];
+const IMAGE_MIME_TYPES: Record<string, string> = {
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.bmp': 'image/bmp',
+    '.tif': 'image/tiff',
+    '.tiff': 'image/tiff',
+    '.webp': 'image/webp',
+    '.heic': 'image/heic',
+};
 const TEXT_EXTS = ['.txt', '.csv', '.tsv', '.eml', '.json', '.md'];
 
 export interface ExtractedAttachmentText {
-    /** File extension without the leading dot, or 'image'/'unknown'. */
+    /** File extension without the leading dot, or 'unknown'. */
     type: string;
     text: string;
     /** Set when `text` is empty because nothing could be extracted. */
     note?: string;
 }
 
-export async function extractAttachmentText(savedPath: string): Promise<ExtractedAttachmentText> {
+export interface ExtractedAttachmentImage {
+    type: 'image';
+    /** Raw bytes, base64-encoded, for a native MCP image content block. */
+    data: string;
+    mimeType: string;
+}
+
+export type ExtractedAttachment = ExtractedAttachmentText | ExtractedAttachmentImage;
+
+export async function extractAttachmentText(savedPath: string): Promise<ExtractedAttachment> {
     const ext = path.extname(savedPath).toLowerCase();
 
-    if (IMAGE_EXTS.includes(ext)) {
-        return {
-            type: 'image',
-            text: '',
-            note: 'Image attachment — no extractable text (a scanned or screenshot document needs manual reading/OCR).',
-        };
+    const imageMimeType = IMAGE_MIME_TYPES[ext];
+    if (imageMimeType) {
+        return { type: 'image', data: fs.readFileSync(savedPath).toString('base64'), mimeType: imageMimeType };
     }
 
     if (ext === '.pdf') {

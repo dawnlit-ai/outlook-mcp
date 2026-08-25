@@ -6,10 +6,18 @@ export interface ToolTextContent {
     text: string;
 }
 
+export interface ToolImageContent {
+    type: 'image';
+    data: string;
+    mimeType: string;
+}
+
+export type ToolContent = ToolTextContent | ToolImageContent;
+
 export interface ToolResult {
     // Matches the MCP SDK's CallToolResult shape (which carries an index
     // signature alongside its known fields) so a ToolResult is assignable to
-    content: ToolTextContent[];
+    content: ToolContent[];
 
     // it without every caller re-declaring the SDK's own type.
     [key: string]: unknown;
@@ -21,6 +29,11 @@ export function text(value: string): ToolResult {
 
 export function json(value: unknown): ToolResult {
     return text(JSON.stringify(value, null, 2));
+}
+
+/** A text block (typically JSON metadata) alongside an inline image block. */
+export function textWithImage(textValue: string, image: { data: string; mimeType: string }): ToolResult {
+    return { content: [{ type: 'text', text: textValue }, { type: 'image', ...image }] };
 }
 
 /** Wrap a tool handler so a thrown error becomes a text result instead of crashing the server. */

@@ -26,7 +26,7 @@ import {
     sendDrafts,
     sendOutlookEmail,
 } from '@dawnlit/outlook-bridge';
-import { json, safe, text } from './helpers';
+import { json, safe, text, textWithImage } from './helpers';
 import { extractAttachmentText } from './attachmentText';
 
 /** How a template email carries several reply variants. Stated once here and
@@ -206,7 +206,7 @@ export function registerOutlookTools(server: McpServer): void {
     }));
 
     server.registerTool('read_outlook_attachment', {
-        description: "Open an attachment on an Outlook email and return its extracted TEXT. Pass the entry_id AND the store_id from the SAME list_outlook_inbox row (store_id disambiguates the email across mailboxes), plus the exact attachment file name (from that email's attachmentNames). Extracts text from PDF, Excel (.xlsx), and plain-text/CSV attachments. Image attachments (a scanned or screenshot document) have no extractable text and are reported as such — read those manually. The result also echoes the resolved email's subject + senderEmail: verify these match who you intended before relying on the numbers, since many replies in a thread share one subject and it's easy to pass a neighboring row's entry_id.",
+        description: "Open an attachment on an Outlook email and return its contents. Pass the entry_id AND the store_id from the SAME list_outlook_inbox row (store_id disambiguates the email across mailboxes), plus the exact attachment file name (from that email's attachmentNames). Extracts text from PDF, Excel (.xlsx), and plain-text/CSV attachments. Image attachments (a scanned or screenshot document) are returned as an inline image alongside the metadata, so read it directly — there's no OCR step to ask for. The result also echoes the resolved email's subject + senderEmail: verify these match who you intended before relying on the numbers, since many replies in a thread share one subject and it's easy to pass a neighboring row's entry_id.",
         inputSchema: {
             entry_id: z.string().describe('Outlook email EntryID (from list_outlook_inbox)'),
             file_name: z.string().max(500).describe('Exact attachment filename to open (from the email\'s attachmentNames)'),
@@ -216,6 +216,19 @@ export function registerOutlookTools(server: McpServer): void {
     }, safe(async ({ entry_id, file_name, store_id, max_chars }) => {
         const saved = await saveEmailAttachmentDetailed(entry_id, file_name, store_id);
         const extracted = await extractAttachmentText(saved.path);
+
+        if ('data' in extracted) {
+            return textWithImage(
+                JSON.stringify({
+                    file: saved.path,
+                    subject: saved.subject,
+                    senderEmail: saved.senderEmail,
+                    type: extracted.type,
+                    mimeType: extracted.mimeType,
+                }, null, 2),
+                extracted,
+            );
+        }
 
         if (!extracted.text) {
             return json({

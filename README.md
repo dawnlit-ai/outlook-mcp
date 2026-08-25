@@ -44,8 +44,8 @@ pre-alert email," an app's own config-stored email templates (as opposed to temp
 `outlook_templates` already covers), or business rules about when to blacklist a sender. Compose those as your own MCP
 tools on top, calling into `@dawnlit/outlook-bridge` directly for anything this package doesn't cover.
 
-`extractAttachmentText(path)` is also exported directly — the PDF/Excel/plain-text extraction behind
-`read_outlook_attachment` — for a host that wants the same extraction without going through the tool call.
+`extractAttachmentText(path)` is also exported directly — the PDF/Excel/plain-text extraction and image passthrough
+behind `read_outlook_attachment` — for a host that wants the same handling without going through the tool call.
 
 ## Development
 

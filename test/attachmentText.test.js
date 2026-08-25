@@ -24,13 +24,13 @@ test('extractAttachmentText reads a plain-text attachment verbatim', async () =>
     }
 });
 
-test('extractAttachmentText reports an image as having no extractable text', async () => {
+test('extractAttachmentText returns an image as base64 with its mime type', async () => {
     const p = writeTemp('photo.png', 'not a real png, just bytes');
     try {
         const result = await extractAttachmentText(p);
         assert.equal(result.type, 'image');
-        assert.equal(result.text, '');
-        assert.match(result.note, /no extractable text/i);
+        assert.equal(result.mimeType, 'image/png');
+        assert.equal(result.data, Buffer.from('not a real png, just bytes').toString('base64'));
     } finally {
         fs.unlinkSync(p);
     }
