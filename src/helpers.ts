@@ -1,5 +1,5 @@
 // Minimal MCP tool-result helpers. Deliberately not imported from anywhere else —
-// small enough to own here rather than add a dependency for three functions.
+// small enough to own here rather than add a dependency for a handful of functions.
 
 export interface ToolTextContent {
     type: 'text';
@@ -31,9 +31,9 @@ export function json(value: unknown): ToolResult {
     return text(JSON.stringify(value, null, 2));
 }
 
-/** A text block (typically JSON metadata) alongside an inline image block. */
-export function textWithImage(textValue: string, image: { data: string; mimeType: string }): ToolResult {
-    return { content: [{ type: 'text', text: textValue }, { type: 'image', ...image }] };
+/** A ToolResult from any mix of content blocks — e.g. JSON metadata alongside an inline image. */
+export function contents(...blocks: ToolContent[]): ToolResult {
+    return { content: blocks };
 }
 
 /** Wrap a tool handler so a thrown error becomes a text result instead of crashing the server. */

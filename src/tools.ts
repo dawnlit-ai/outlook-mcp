@@ -26,7 +26,7 @@ import {
     sendDrafts,
     sendOutlookEmail,
 } from '@dawnlit/outlook-bridge';
-import { json, safe, text, textWithImage } from './helpers';
+import { contents, json, safe, text } from './helpers';
 import { extractAttachmentText } from './attachmentText';
 
 /** How a template email carries several reply variants. Stated once here and
@@ -65,7 +65,7 @@ export function registerOutlookTools(server: McpServer): void {
         description: "Read ONE email's full plain-text body by entryId, when list_outlook_inbox's ~600-char bodyPreview isn't enough. Returns the sender's own text with the quoted thread stripped off (and the resolved subject/sender so you can confirm it's the email you meant). Plain text, not HTML: an HTML table's rows flatten, so read a tabular figure from its attachment (read_outlook_attachment) instead. Pass the store_id from the same list_outlook_inbox row so the email resolves unambiguously across mailboxes.",
         inputSchema: {
             entry_id: z.string().describe('Outlook email EntryID (from list_outlook_inbox)'),
-            store_id: z.string().describe('Outlook StoreID from the same list_outlook_inbox row — disambiguates the email across mailboxes').optional(),
+            store_id: z.string().describe('Outlook StoreID from the same list_outlook_inbox row — disambiguate the email across mailboxes').optional(),
             max_chars: z.number().int().min(500).max(50000).describe('Cap on the returned body (default 8000); `truncated` and `bodyLength` report when it bit').default(8000),
             include_quoted: z.boolean().describe('Also return the quoted thread below the reply (default false). Set true only to mine the thread for the original message. `quotedLength` reports its size either way.').default(false),
         },
@@ -103,7 +103,7 @@ export function registerOutlookTools(server: McpServer): void {
         inputSchema: {
             email_account: z.string().describe('Outlook email account address to send/draft the reply as'),
             entry_id: z.string().describe('EntryID of the email being replied to (from list_outlook_inbox)'),
-            store_id: z.string().describe('Outlook StoreID from the same list_outlook_inbox row — disambiguates the email across mailboxes').optional(),
+            store_id: z.string().describe('Outlook StoreID from the same list_outlook_inbox row — disambiguate the email across mailboxes').optional(),
             html_body: z.string().max(100000).describe('HTML inserted above the quoted original, used verbatim. Omit when using template_subject.').optional(),
             template_subject: z.string().max(300).describe('Reply with a template email resolved BY SUBJECT from the mailbox instead of passing html_body. Confirm the subject exists first with outlook_templates (action \'list\', include_body:false is enough). One of html_body / template_subject is required.').optional(),
             template_folder: z.string().max(200).describe("Folder holding the template when template_subject is used (default 'Templates')").default('Templates'),
@@ -198,7 +198,7 @@ export function registerOutlookTools(server: McpServer): void {
         inputSchema: {
             entry_id: z.string().describe('Outlook email EntryID (from list_outlook_inbox)'),
             file_name: z.string().max(500).describe("Exact attachment filename to save (e.g. 'invoice.pdf')"),
-            store_id: z.string().describe('Outlook StoreID from the same list_outlook_inbox row — disambiguates the email across mailboxes').optional(),
+            store_id: z.string().describe('Outlook StoreID from the same list_outlook_inbox row — disambiguate the email across mailboxes').optional(),
         },
     }, safe(async ({ entry_id, file_name, store_id }) => {
         const savedPath = await saveEmailAttachment(entry_id, file_name, store_id);
@@ -206,47 +206,32 @@ export function registerOutlookTools(server: McpServer): void {
     }));
 
     server.registerTool('read_outlook_attachment', {
-        description: "Open an attachment on an Outlook email and return its contents. Pass the entry_id AND the store_id from the SAME list_outlook_inbox row (store_id disambiguates the email across mailboxes), plus the exact attachment file name (from that email's attachmentNames). Extracts text from PDF, Excel (.xlsx), and plain-text/CSV attachments. Image attachments (a scanned or screenshot document) are returned as an inline image alongside the metadata, so read it directly — there's no OCR step to ask for. The result also echoes the resolved email's subject + senderEmail: verify these match who you intended before relying on the numbers, since many replies in a thread share one subject and it's easy to pass a neighboring row's entry_id.",
+        description: "Open an attachment on an Outlook email and return its contents. Pass the entry_id AND the store_id from the SAME list_outlook_inbox row (store_id disambiguate the email across mailboxes), plus the exact attachment file name (from that email's attachmentNames). Extracts text from PDF, Excel (.xlsx), and plain-text/CSV attachments. Image attachments (a scanned or screenshot document) are returned as an inline image alongside the metadata, so read it directly — there's no OCR step to ask for. The result also echoes the resolved email's subject + senderEmail: verify these match who you intended before relying on the numbers, since many replies in a thread share one subject and it's easy to pass a neighboring row's entry_id.",
         inputSchema: {
             entry_id: z.string().describe('Outlook email EntryID (from list_outlook_inbox)'),
             file_name: z.string().max(500).describe('Exact attachment filename to open (from the email\'s attachmentNames)'),
-            store_id: z.string().describe('Outlook StoreID from the same list_outlook_inbox row — disambiguates the email across mailboxes').optional(),
+            store_id: z.string().describe('Outlook StoreID from the same list_outlook_inbox row — disambiguate the email across mailboxes').optional(),
             max_chars: z.number().int().min(500).max(100000).describe('Max characters of extracted text to return (default 20000)').default(20000),
         },
     }, safe(async ({ entry_id, file_name, store_id, max_chars }) => {
         const saved = await saveEmailAttachmentDetailed(entry_id, file_name, store_id);
         const extracted = await extractAttachmentText(saved.path);
+        const base = { file: saved.path, subject: saved.subject, senderEmail: saved.senderEmail, type: extracted.type };
 
         if ('data' in extracted) {
-            return textWithImage(
-                JSON.stringify({
-                    file: saved.path,
-                    subject: saved.subject,
-                    senderEmail: saved.senderEmail,
-                    type: extracted.type,
-                    mimeType: extracted.mimeType,
-                }, null, 2),
+            return contents(
+                { type: 'text', text: JSON.stringify({ ...base, mimeType: extracted.mimeType }, null, 2) },
                 extracted,
             );
         }
 
         if (!extracted.text) {
-            return json({
-                file: saved.path,
-                subject: saved.subject,
-                senderEmail: saved.senderEmail,
-                type: extracted.type,
-                text: '',
-                note: extracted.note,
-            });
+            return json({ ...base, text: '', note: extracted.note });
         }
 
         const truncated = extracted.text.length > max_chars;
         return json({
-            file: saved.path,
-            subject: saved.subject,
-            senderEmail: saved.senderEmail,
-            type: extracted.type,
+            ...base,
             chars: extracted.text.length,
             truncated,
             text: truncated ? extracted.text.slice(0, max_chars) : extracted.text,
