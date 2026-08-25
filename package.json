@@ -1,6 +1,6 @@
 {
   "name": "@dawnlit/outlook-mcp",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "MCP tools exposing @dawnlit/outlook-bridge's Outlook automation — read, send, reply, file, and template mail — to any MCP host.",
   "license": "Apache-2.0",
   "author": "Dawnlit",
@@ -38,12 +38,13 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc -p .",
+    "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc -p .",
     "test": "npm run build && node --test \"test/*.test.js\"",
     "prepare": "npm run build"
   },
   "dependencies": {
-    "@dawnlit/outlook-bridge": "^1.0.0",
+    "@dawnlit/outlook-bridge": "^1.1.0",
     "exceljs": "^4.4.0",
     "pdf-parse": "^2.4.5"
   },

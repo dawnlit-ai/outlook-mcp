@@ -7,15 +7,23 @@ host is a freight-forwarding assistant, a sales CRM, or anything else that wants
 
 ## Install
 
-Neither this package nor `@dawnlit/outlook-bridge` is on the npm registry yet — install both straight off GitHub
-`main`:
-
 ```bash
-npm install github:dawnlit-ai/outlook-bridge#main github:dawnlit-ai/outlook-mcp#main
+npm install @dawnlit/outlook-mcp
 ```
 
-Also requires `@modelcontextprotocol/sdk` and `zod` (peer dependencies — bring whatever versions your server already
-uses; `zod` needs `^3.25` or `^4.0`, matching what the SDK itself accepts).
+`@dawnlit/outlook-bridge` comes along as a regular dependency. Also requires `@modelcontextprotocol/sdk` and `zod`
+(peer dependencies — bring whatever versions your server already uses; `zod` needs `^3.25` or `^4.0`, matching what the
+SDK itself accepts).
+
+To track unreleased changes instead of the last published version, install straight off GitHub `master`:
+
+```bash
+npm install github:dawnlit-ai/outlook-mcp#master
+```
+
+`prepare` runs `npm run build` automatically on install, so `dist/` is built from that checked-out source with no
+separate step. npm resolves the branch to a commit and pins it in `package-lock.json`, so a later plain `npm install`
+won't pick up new commits on its own — re-run the command above whenever you want to advance to the current tip.
 
 ## Usage
 
