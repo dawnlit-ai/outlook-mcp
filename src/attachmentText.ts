@@ -6,8 +6,8 @@
 // unhandled rather than guessed at.
 import fs from 'fs';
 import path from 'path';
-import ExcelJS from 'exceljs';
 import { readPdfText } from './pdf';
+import { readXlsxText } from './xlsx';
 
 const IMAGE_MIME_TYPES: Record<string, string> = {
     '.png': 'image/png',
@@ -52,21 +52,7 @@ export async function extractAttachmentText(savedPath: string): Promise<Extracte
     }
 
     if (ext === '.xlsx') {
-        const wb = new ExcelJS.Workbook();
-        await wb.xlsx.readFile(savedPath);
-        const lines: string[] = [];
-        wb.worksheets.forEach((ws) => {
-            lines.push(`# ${ws.name}`);
-            ws.eachRow({ includeEmpty: false }, (row) => {
-                const vals: string[] = [];
-                row.eachCell({ includeEmpty: false }, (cell) => {
-                    const v = String(cell.text ?? '').trim();
-                    if (v) vals.push(v);
-                });
-                if (vals.length) lines.push(vals.join('\t'));
-            });
-        });
-        return { type: 'xlsx', text: lines.join('\n') };
+        return { type: 'xlsx', text: await readXlsxText(savedPath) };
     }
 
     if (TEXT_EXTS.includes(ext)) {
