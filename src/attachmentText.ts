@@ -9,17 +9,21 @@ import path from 'path';
 import { readPdfText } from './pdf';
 import { readXlsxText } from './xlsx';
 
+// The four formats Claude's vision accepts. The others an email actually carries —
+// a TIFF fax of a B/L, a HEIC phone photo — are listed separately below rather than
+// mapped to their real mime type: MCP would transport such a block happily (mimeType
+// is a free string) and the API would reject it, costing the whole request instead of
+// just this tool.
 const IMAGE_MIME_TYPES: Record<string, string> = {
     '.png': 'image/png',
     '.jpg': 'image/jpeg',
     '.jpeg': 'image/jpeg',
     '.gif': 'image/gif',
-    '.bmp': 'image/bmp',
-    '.tif': 'image/tiff',
-    '.tiff': 'image/tiff',
     '.webp': 'image/webp',
-    '.heic': 'image/heic',
 };
+const UNREADABLE_IMAGE_EXTS = ['.bmp', '.tif', '.tiff', '.heic'];
+/** An image block accepts 10 MB of base64, which is this many bytes on disk. */
+const MAX_IMAGE_BYTES = Math.floor((10 * 1024 * 1024 * 3) / 4);
 const TEXT_EXTS = ['.txt', '.csv', '.tsv', '.eml', '.json', '.md'];
 
 export interface ExtractedAttachmentText {
@@ -44,7 +48,22 @@ export async function extractAttachmentText(savedPath: string): Promise<Extracte
 
     const imageMimeType = IMAGE_MIME_TYPES[ext];
     if (imageMimeType) {
+        if (fs.statSync(savedPath).size > MAX_IMAGE_BYTES) {
+            return {
+                type: ext.replace('.', ''),
+                text: '',
+                note: `Image is over the ${(MAX_IMAGE_BYTES / 1024 / 1024).toFixed(1)} MB an image block holds — open the file at the path.`,
+            };
+        }
         return { type: 'image', data: fs.readFileSync(savedPath).toString('base64'), mimeType: imageMimeType };
+    }
+
+    if (UNREADABLE_IMAGE_EXTS.includes(ext)) {
+        return {
+            type: ext.replace('.', ''),
+            text: '',
+            note: `Claude reads JPEG, PNG, GIF and WebP only — convert this ${ext.replace('.', '').toUpperCase()}, or open the file at the path.`,
+        };
     }
 
     if (ext === '.pdf') {

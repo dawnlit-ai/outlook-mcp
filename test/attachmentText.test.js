@@ -71,3 +71,28 @@ test('extractAttachmentText keeps a sparse row under its own columns', async () 
         fs.unlinkSync(p);
     }
 });
+
+test('extractAttachmentText refuses an image format Claude cannot read', async () => {
+    const p = writeTemp('scan.tiff', 'II*\u0000 pretend TIFF bytes');
+    try {
+        const result = await extractAttachmentText(p);
+        assert.equal(result.type, 'tiff');
+        assert.equal(result.text, '');
+        assert.match(result.note, /JPEG, PNG, GIF and WebP only/);
+    } finally {
+        fs.unlinkSync(p);
+    }
+});
+
+test('extractAttachmentText refuses an image too large for an image block', async () => {
+    const p = path.join(os.tmpdir(), `outlook-mcp-test-${Date.now()}-huge.png`);
+    fs.writeFileSync(p, Buffer.alloc(8 * 1024 * 1024));
+    try {
+        const result = await extractAttachmentText(p);
+        assert.equal(result.type, 'png');
+        assert.equal(result.data, undefined);
+        assert.match(result.note, /open the file at the path/);
+    } finally {
+        fs.unlinkSync(p);
+    }
+});
