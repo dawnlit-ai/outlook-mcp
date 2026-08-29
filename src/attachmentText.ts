@@ -6,8 +6,8 @@
 // unhandled rather than guessed at.
 import fs from 'fs';
 import path from 'path';
-import { PDFParse } from 'pdf-parse';
 import ExcelJS from 'exceljs';
+import { readPdfText } from './pdf';
 
 const IMAGE_MIME_TYPES: Record<string, string> = {
     '.png': 'image/png',
@@ -48,14 +48,7 @@ export async function extractAttachmentText(savedPath: string): Promise<Extracte
     }
 
     if (ext === '.pdf') {
-        const buf = fs.readFileSync(savedPath);
-        const parser = new PDFParse({ data: buf });
-        try {
-            const parsed = await parser.getText();
-            return { type: 'pdf', text: parsed.text || '' };
-        } finally {
-            await parser.destroy();
-        }
+        return { type: 'pdf', text: await readPdfText(savedPath) };
     }
 
     if (ext === '.xlsx') {
