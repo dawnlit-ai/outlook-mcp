@@ -1,7 +1,7 @@
 // Composing and sending mail: replying (including from mailbox-stored
 // templates), fresh sends, signature discovery, and template management.
 import { z } from 'zod';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import {
     listOutlookSignatures,
     readTemplateEmails,

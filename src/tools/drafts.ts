@@ -1,7 +1,7 @@
 // Managing what's sitting in Outlook's Drafts folder: listing, retracting
 // (delete), sending a chosen subset, and sending everything at once.
 import { z } from 'zod';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { deleteOutlookDrafts, listOutlookDrafts, sendAllDrafts, sendDrafts, } from '@dawnlit/outlook-bridge';
 import { json, safe } from '../helpers';
 

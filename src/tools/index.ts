@@ -4,7 +4,7 @@
 // itself stores, no business rules about what counts as a given kind of email.
 // A host that wants those layers composes them on top by registering its own
 // tools alongside these.
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { registerAttachmentTools } from './attachments';
 import { registerCleanupTools } from './cleanup';
 import { registerComposeTools } from './compose';

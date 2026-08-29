@@ -1,7 +1,7 @@
 // Downloading and reading Outlook attachments — a raw save-to-disk tool and
 // a save-plus-extract-text (or return-as-image) tool.
 import { z } from 'zod';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { saveEmailAttachment, saveEmailAttachmentDetailed } from '@dawnlit/outlook-bridge';
 import { contents, json, safe, text } from '../helpers';
 import { extractAttachmentText } from '../attachmentText';

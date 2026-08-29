@@ -2,7 +2,7 @@
 // narrower gates: deleting arbitrary mail by id, and permanently purging
 // Deleted Items.
 import { z } from 'zod';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { deleteOutlookEmails, purgeDeletedItems } from '@dawnlit/outlook-bridge';
 import { json, safe } from '../helpers';
 
