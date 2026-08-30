@@ -20,7 +20,7 @@ const TEMPLATE_MECHANICS =
 export function registerComposeTools(server: McpServer): void {
     server.registerTool('reply_outlook_email', {
         description: "Reply to a specific email (by entry_id from list_outlook_inbox): creates a TRUE reply — your html_body inserted above the quoted original, To/subject taken from the original, threads correctly in the recipient's mailbox. Prefer this over send_outlook_email when answering an email you've read; use send_outlook_email only for fresh outreach. Pass the store_id from the SAME listing row, and verify the echoed repliedToSender matches who you meant (same-thread rows have look-alike EntryIDs). For a templated reply, pass template_subject instead of html_body — the server resolves the saved template's body, section, placeholders and signature itself, so the (often large) template HTML never crosses this call and there is no size cap to hit. IMPORTANT: preview with the user before calling unless they've approved a batch. Draft mode mirrors send_outlook_email: send_immediately false + open_draft_window false saves silently to Drafts — the right choice for batches.",
-        inputSchema: {
+        inputSchema: z.object({
             email_account: z.string().describe('Outlook email account address to send/draft the reply as'),
             entry_id: z.string().describe('EntryID of the email being replied to (from list_outlook_inbox)'),
             store_id: z.string().describe('Outlook StoreID from the same list_outlook_inbox row — disambiguate the email across mailboxes').optional(),
@@ -32,7 +32,7 @@ export function registerComposeTools(server: McpServer): void {
             signature: z.string().max(200).describe("Name of an Outlook signature (from list_outlook_signatures) to substitute into the template's {{SIGNATURE}} placeholder — resolved server-side, images included. Required when the template has that placeholder; the call fails rather than mail out an unsigned reply. Omit for templates whose signature is written into the body.").optional(),
             send_immediately: z.boolean().describe('If true, send immediately; if false (default), stage as a draft').default(false),
             open_draft_window: z.boolean().describe('Draft mode only: true (default) opens a compose window; false saves silently to the Drafts folder — use false for batches').default(true),
-        },
+        }),
     }, safe(async ({
                        email_account,
                        entry_id,
@@ -70,7 +70,7 @@ export function registerComposeTools(server: McpServer): void {
 
     server.registerTool('list_outlook_signatures', {
         description: "List the names of the Outlook signatures configured on this machine (the .htm files in the user's Signatures folder). Use before reply_outlook_email's `signature` when the template holds a {{SIGNATURE}} placeholder: exactly one name means use it, several means ASK THE USER which to sign with — the names are machine-wide and carry no account association, so never infer one from the sending address. An empty list means no signature is set up; ask the user what to sign with rather than inventing a name or sending unsigned. Returns names only — the signature HTML is resolved server-side when replying and never enters the conversation.",
-        inputSchema: {},
+        inputSchema: z.object({}),
     }, safe(async () => {
         const names = await listOutlookSignatures();
         return json({
@@ -90,7 +90,7 @@ export function registerComposeTools(server: McpServer): void {
             TEMPLATE_MECHANICS + ' ' +
             "'list' returns each template's subject, `sections` and `placeholders`. ⚠️ These bodies are often Word-generated and can run tens of thousands of characters EACH, so include_body:true across a folder can blow the response limit — the default include_body:false gives subjects, sections, placeholders and a short preview, which is everything you need to confirm a template is intact before drafting from it. Always reply via reply_outlook_email's template_subject, which resolves the body server-side; fetching a body with `subject` + include_body:true is a last resort, for inspecting a template that looks broken. If the folder doesn't exist, 'list' returns folderFound:false plus the mailbox's folder names — ASK THE USER what to do rather than silently inventing wording. Images embedded in a template (signature logos etc.) are STRIPPED from a returned htmlBody, since neither cid: nor file: refs survive into a new email reliably. " +
             "'save' adds a NEW template, creating the folder at the mailbox root if missing — only after the user has explicitly agreed to create it, and never to 'update' an existing one (it always adds, never overwrites; the user edits templates in Outlook).",
-        inputSchema: {
+        inputSchema: z.object({
             action: z.enum(['list', 'save']).describe("'list' = the folder's templates (read-only). 'save' = add a new template; needs `subject` and `html_body`."),
             email_account: z.string().describe('Outlook email account address (the mailbox holding the Templates folder)'),
             folder_name: z.string().max(200).describe("Mailbox folder holding the templates (default 'Templates'; searched case-insensitively up to 3 levels deep, and for 'save' created at the mailbox root if absent)").default('Templates'),
@@ -98,7 +98,7 @@ export function registerComposeTools(server: McpServer): void {
             html_body: z.string().describe("'save' only: the template's HTML body, reused later as a reply body.").optional(),
             limit: z.number().int().min(1).max(50).describe("'list' only: maximum templates to return, most recently modified first (default 20)").default(20),
             include_body: z.boolean().describe("'list' only: false (default) returns subjects, sections, placeholders and a short bodyPreview; true also returns each full htmlBody — pair it with `subject` so only one body is pulled.").default(false),
-        },
+        }),
     }, safe(async ({ action, email_account, folder_name, subject, html_body, limit, include_body }) => {
         if (action === 'list') {
             return json(await readTemplateEmails(email_account, folder_name, limit, include_body, subject));
@@ -115,7 +115,7 @@ export function registerComposeTools(server: McpServer): void {
 
     server.registerTool('send_outlook_email', {
         description: 'Send an email via Outlook, or stage it as a draft. IMPORTANT: Before calling this tool, always show the user a preview of the email (recipients, subject, body summary) and ask for confirmation. Only set send_immediately to true if the user explicitly asks to send without preview. When send_immediately is false (default), the email is a DRAFT: by default it opens in an Outlook compose window for review; set open_draft_window to false to save it silently to the Drafts folder with NO window — the right choice for a batch, so you don\'t pop dozens of windows. Silent drafts land in Outlook\'s Drafts folder for the user to review and send (send_all_drafts can send them in bulk once approved).',
-        inputSchema: {
+        inputSchema: z.object({
             email_account: z.string().describe('Outlook email account address (sender)'),
             to: z.string().describe('Recipient email addresses (semicolon-separated)'),
             cc: z.string().describe('CC email addresses (semicolon-separated)').default(''),
@@ -124,7 +124,7 @@ export function registerComposeTools(server: McpServer): void {
             attachment_path: z.string().max(1000).describe('Absolute path to attachment file').optional(),
             send_immediately: z.boolean().describe('If true, send immediately; if false, stage as a draft').default(false),
             open_draft_window: z.boolean().describe('Draft mode only (send_immediately false): true (default) opens a compose window for review; false saves silently to the Drafts folder with no window — use false for batches so you don\'t open a window per email').default(true),
-        },
+        }),
     }, safe(async ({
                        email_account,
                        to,
