@@ -1,7 +1,7 @@
 {
   "name": "@dawnlit/outlook-mcp",
-  "version": "1.1.0",
-  "description": "MCP tools exposing @dawnlit/outlook-bridge's Outlook automation — read, send, reply, file, and template mail — to any MCP host.",
+  "version": "2.0.0",
+  "description": "MCP tools for @dawnlit/outlook-bridge — let any MCP host read, search, send, reply to, file and template mail through the real Outlook client.",
   "license": "Apache-2.0",
   "author": "Dawnlit",
   "homepage": "https://github.com/dawnlit-ai/outlook-mcp#readme",
@@ -48,7 +48,7 @@
     "prepare": "npm run build"
   },
   "dependencies": {
-    "@dawnlit/outlook-bridge": "^1.1.0",
+    "@dawnlit/outlook-bridge": "^2.0.0",
     "exceljs": "^4.4.0",
     "pdf-parse": "^2.4.5"
   },
@@ -58,7 +58,7 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
-    "@types/node": "^24.0.0",
+    "@types/node": "^24.13.3",
     "typescript": "~6.0.3",
     "zod": "^4.4.3"
   }

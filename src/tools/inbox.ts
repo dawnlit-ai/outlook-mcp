@@ -1,73 +1,92 @@
-// Reading and organizing an Outlook mailbox: accounts, inbox listing, a
-// single email's full body, folder discovery, and moving mail between
-// folders.
+// Reading and organizing a mailbox: accounts, listing mail, one email's full
+// body, folder discovery, and filing mail into folders.
 import { z } from 'zod';
-import type { McpServer } from '@modelcontextprotocol/server';
-import {
-    getOutlookAccounts,
-    listInboxFolders,
-    moveOutlookEmails,
-    readEmailBody,
-    readInboxEmails,
-} from '@dawnlit/outlook-bridge';
-import { json, safe } from '../helpers';
+import { json, toolHandler } from '../results';
+import type { ToolContext } from './context';
 
-/** Register account listing, inbox reading, folder listing, and move tools on `server`. */
-export function registerInboxTools(server: McpServer): void {
-    server.registerTool('get_outlook_accounts', {
-        description: 'Get list of Outlook email accounts configured on this system',
-    }, safe(async () => {
-        const accounts = await getOutlookAccounts();
-        return json(accounts);
-    }));
+const EMAIL_ACCOUNT = z.string().describe('Outlook email account address (from get_outlook_accounts)');
+const ENTRY_ID = z.string().describe('The email\'s entryId, from the listing row that found it');
+const STORE_ID = z.string().describe('The storeId from the SAME listing row — it lets the email resolve in any mailbox, not just the default one').optional();
 
-    server.registerTool('list_outlook_inbox', {
-        description: "List recent emails from an Outlook inbox. Returns metadata and a short body preview — attachments are NOT downloaded (use save_outlook_attachment / read_outlook_attachment for those). By default it reads the Inbox ROOT only: mail already filed into a subfolder is invisible until you pass `folder`.",
+export function registerInboxTools({ server, bridge, add }: ToolContext): void {
+    add('get_outlook_accounts', 'read', () => server.registerTool('get_outlook_accounts', {
+        title: 'List Outlook accounts',
+        description: 'List the mailboxes (as email addresses) the Outlook profile on this machine can reach. Every other Outlook tool takes one of these as `email_account`.',
+        inputSchema: z.object({}),
+        annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    }, toolHandler(async () => json(await bridge.getOutlookAccounts()))));
+
+    add('list_outlook_inbox', 'read', () => server.registerTool('list_outlook_inbox', {
+        title: 'List Outlook mail',
+        description:
+            'List recent emails from an Outlook mailbox, newest first: metadata, a short body preview, and attachment NAMES (nothing is downloaded — use read_outlook_attachment or save_outlook_attachment for those). ' +
+            'By default it reads the Inbox ROOT only: mail already filed into a subfolder is invisible until you pass `folder`.',
         inputSchema: z.object({
-            email_account: z.string().describe('Outlook email account address'),
-            days_back: z.number().int().min(1).max(365).describe('How many days back to scan (default 60)').default(60),
-            limit: z.number().int().min(1).max(200).describe('Maximum number of emails to return, newest first (default 50)').default(50),
-            folder: z.string().max(300).describe("Read ONE folder instead of the Inbox root. Two kinds of value: (a) a folder under the Inbox — a bare name ('Invoices'), a relative path ('Invoices\\2026'), or the full folderPath list_outlook_inbox_folders prints; (b) a WELL-KNOWN folder by name — 'Sent Items', 'Drafts', 'Deleted Items', 'Junk Email', 'Outbox' — optionally with a path under it ('Deleted Items\\2026'). ⭐ 'Sent Items' is how you answer \"has this already gone out?\". Sent Items/Outbox/Drafts have no ReceivedTime, so they are filtered and stamped on SentOn / LastModificationTime instead, and `senderName`/`senderEmail` carry the RECIPIENT there (outgoing mail has no meaningful sender of its own). A well-known name wins over a user folder of the same name — reach that one as 'Inbox\\Drafts'. Only the named folder is read, NOT its subfolders. Each row echoes `folderPath` so you can confirm what matched; unknown names throw and list the alternatives rather than silently falling back to the root.").optional(),
+            email_account: EMAIL_ACCOUNT,
+            days_back: z.number().int().min(1).max(3650).describe('How many days back to read (default 60)').default(60),
+            limit: z.number().int().min(1).max(500).describe('Maximum emails to return, newest first (default 50)').default(50),
+            folder: z.string().max(300).describe(
+                "Read ONE folder instead of the Inbox root. Either (a) a folder under the Inbox — a bare name ('Invoices'), a relative path ('Invoices\\2026'), or a folderPath list_outlook_inbox_folders printed; or (b) a well-known folder — 'Sent Items', 'Drafts', 'Deleted Items', 'Junk Email', 'Outbox' — optionally with a path under it ('Deleted Items\\2026'). " +
+                "⭐ 'Sent Items' is how to answer \"has this already gone out?\". In Sent Items, Outbox and Drafts, `senderName`/`senderEmail` carry the RECIPIENT, since outgoing mail has no meaningful sender of its own. " +
+                "A well-known name wins over a user folder of the same name — reach that one as 'Inbox\\Drafts'. Only the named folder is read, not its subfolders. Each row echoes `folderPath`; an unknown folder fails and lists the folders there are.",
+            ).optional(),
+            preview_chars: z.number().int().min(0).max(5000).describe('Characters of plain-text body preview per email (default 600; 0 skips bodies for a faster listing)').default(600),
         }),
-    }, safe(async ({ email_account, days_back, limit, folder }) => {
-        const entries = await readInboxEmails(email_account, days_back, limit, folder);
-        return json(entries);
-    }));
+        annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    }, toolHandler(async ({ email_account, days_back, limit, folder, preview_chars }) => json(
+        await bridge.readInboxEmails(email_account, {
+            daysBack: days_back,
+            limit,
+            folder,
+            previewChars: preview_chars
+        }),
+    ))));
 
-    server.registerTool('read_outlook_email_body', {
-        description: "Read ONE email's full plain-text body by entryId, when list_outlook_inbox's ~600-char bodyPreview isn't enough. Returns the sender's own text with the quoted thread stripped off (and the resolved subject/sender so you can confirm it's the email you meant). Plain text, not HTML: an HTML table's rows flatten, so read a tabular figure from its attachment (read_outlook_attachment) instead. Pass the store_id from the same list_outlook_inbox row so the email resolves unambiguously across mailboxes.",
+    add('read_outlook_email_body', 'read', () => server.registerTool('read_outlook_email_body', {
+        title: 'Read an Outlook email',
+        description:
+            "Read ONE email's full plain-text body, when a listing's preview isn't enough. Returns the sender's own text with the quoted thread split off, plus the resolved subject and sender so you can confirm it's the email you meant. " +
+            'Plain text, not HTML: an HTML table\'s rows flatten, so read tabular figures from an attachment (read_outlook_attachment) where there is one.',
         inputSchema: z.object({
-            entry_id: z.string().describe('Outlook email EntryID (from list_outlook_inbox)'),
-            store_id: z.string().describe('Outlook StoreID from the same list_outlook_inbox row — disambiguate the email across mailboxes').optional(),
-            max_chars: z.number().int().min(500).max(50000).describe('Cap on the returned body (default 8000); `truncated` and `bodyLength` report when it bit').default(8000),
-            include_quoted: z.boolean().describe('Also return the quoted thread below the reply (default false). Set true only to mine the thread for the original message. `quotedLength` reports its size either way.').default(false),
+            entry_id: ENTRY_ID,
+            store_id: STORE_ID,
+            max_chars: z.number().int().min(500).max(100000).describe('Cap on the returned body (default 8000); `truncated` and `bodyLength` report when it bit').default(8000),
+            include_quoted: z.boolean().describe('Also return the quoted thread below the reply (default false). `quotedLength` reports its size either way.').default(false),
         }),
-    }, safe(async ({ entry_id, store_id, max_chars, include_quoted }) => {
-        const result = await readEmailBody(entry_id, store_id, max_chars, include_quoted);
-        return json(result);
-    }));
+        annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    }, toolHandler(async ({ entry_id, store_id, max_chars, include_quoted }) => json(
+        await bridge.readEmailBody({ entryId: entry_id, storeId: store_id }, {
+            maxChars: max_chars,
+            includeQuoted: include_quoted
+        }),
+    ))));
 
-    server.registerTool('list_outlook_inbox_folders', {
-        description: "List the folders under an Outlook account's Inbox, with item counts. Use before move_outlook_emails to find the right destination and present the choices to the user.",
+    add('list_outlook_inbox_folders', 'read', () => server.registerTool('list_outlook_inbox_folders', {
+        title: 'List Outlook folders',
+        description: "List the folders under an account's Inbox, with item counts. Use it to find where mail is filed, and before move_outlook_emails to find — and show the user — the destination.",
         inputSchema: z.object({
-            email_account: z.string().describe('Outlook email account address'),
-            max_depth: z.number().int().min(1).max(4).describe('How many levels below Inbox to list (default 2)').default(2),
+            email_account: EMAIL_ACCOUNT,
+            max_depth: z.number().int().min(1).max(10).describe('How many levels below the Inbox to list (default 2)').default(2),
         }),
-    }, safe(async ({ email_account, max_depth }) => {
-        const folders = await listInboxFolders(email_account, max_depth);
-        return json(folders);
-    }));
+        annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    }, toolHandler(async ({ email_account, max_depth }) => json(
+        await bridge.listInboxFolders(email_account, { maxDepth: max_depth }),
+    ))));
 
-    server.registerTool('move_outlook_emails', {
-        description: "Move emails (by entryId from list_outlook_inbox) into any folder of the account — used to file processed emails. ⭐ Moving to 'Deleted Items' is ALSO how you delete mail reversibly, and is the right way to get an email out of the way: it survives in Deleted Items instead of being destroyed, so prefer it over delete_outlook_emails for anything that isn't a draft. IMPORTANT: moving the user's mail is a visible bulk action — list the folders (list_outlook_inbox_folders), tell the user exactly what would move where, and get explicit confirmation BEFORE calling. Moving changes each item's EntryID, so any saved ids are stale afterwards. Returns the resolved folderPath, whether it was created, the moved count and per-item failures.",
+    add('move_outlook_emails', 'write', () => server.registerTool('move_outlook_emails', {
+        title: 'Move Outlook emails',
+        description:
+            "Move emails (by entryId) into a folder of the account — how processed mail gets filed. ⭐ Moving to 'Deleted Items' is also the right way to get an email out of the way: it stays recoverable there, so prefer it to delete_outlook_emails for anything but a draft. " +
+            'IMPORTANT: moving someone\'s mail is a visible bulk action — find the destination with list_outlook_inbox_folders, tell the user exactly what would move where, and get their confirmation BEFORE calling. ' +
+            'Moving changes each email\'s entryId, so ids saved earlier are stale afterwards. Returns the resolved folderPath, whether it was created, the count moved, and any per-email failures.',
         inputSchema: z.object({
-            email_account: z.string().describe('Outlook email account address'),
-            entry_ids: z.array(z.string()).min(1).max(100).describe('EntryIDs of the emails to move (from list_outlook_inbox; max 100 per call)'),
-            folder_name: z.string().max(200).describe("Destination: a folder under the Inbox by bare name ('Invoices') or nested path ('Invoices\\2026'), or a well-known folder — 'Deleted Items', 'Junk Email', 'Drafts', 'Sent Items' — optionally with a path under it. A well-known name wins over a user folder of the same name; qualify as 'Inbox\\Drafts' to reach that one."),
-            create_if_missing: z.boolean().describe('Create the destination if absent — the WHOLE missing chain, so a nested path is one call rather than needing the parent made by hand first (default false; ask the user first, and note that a typo\'d path then becomes a real folder rather than an error)').default(false),
+            email_account: EMAIL_ACCOUNT,
+            entry_ids: z.array(z.string()).min(1).max(100).describe('entryIds of the emails to move (max 100 per call)'),
+            folder_name: z.string().max(300).describe("Destination: a folder under the Inbox by name ('Invoices') or path ('Invoices\\2026'), or a well-known folder — 'Deleted Items', 'Junk Email', 'Drafts', 'Sent Items' — optionally with a path under it. A well-known name wins over a user folder of the same name; write 'Inbox\\Drafts' for that one."),
+            create_if_missing: z.boolean().describe("Create the destination when absent — the whole missing chain, so a nested path is one call (default false). Ask the user first: a mistyped path becomes a real folder instead of an error.").default(false),
         }),
-    }, safe(async ({ email_account, entry_ids, folder_name, create_if_missing }) => {
-        const result = await moveOutlookEmails(email_account, entry_ids, folder_name, create_if_missing);
-        return json(result);
-    }));
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    }, toolHandler(async ({ email_account, entry_ids, folder_name, create_if_missing }) => json(
+        await bridge.moveOutlookEmails(email_account, entry_ids, folder_name, { createIfMissing: create_if_missing }),
+    ))));
 }

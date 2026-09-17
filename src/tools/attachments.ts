@@ -1,55 +1,66 @@
-// Downloading and reading Outlook attachments — a raw save-to-disk tool and
-// a save-plus-extract-text (or return-as-image) tool.
+// Attachments: saving one to disk, and reading one — extracted text, or the
+// image itself.
 import { z } from 'zod';
-import type { McpServer } from '@modelcontextprotocol/server';
-import { saveEmailAttachment, saveEmailAttachmentDetailed } from '@dawnlit/outlook-bridge';
-import { contents, json, safe, text } from '../helpers';
-import { extractAttachmentText } from '../attachmentText';
+import { extractAttachmentContent } from '../attachmentContent';
+import { contents, json, text, toolHandler } from '../results';
+import type { ToolContext } from './context';
 
-/** Register the attachment-saving and attachment-reading tools on `server`. */
-export function registerAttachmentTools(server: McpServer): void {
-    server.registerTool('save_outlook_attachment', {
-        description: "Download a specific attachment from an Outlook email to a temp directory, returning the saved file path. Pass the entryId (and, when the same row has one, the store_id) so the email resolves unambiguously across multiple mailboxes.",
+const ENTRY_ID = z.string().describe('The email\'s entryId, from the listing row that found it');
+const STORE_ID = z.string().describe('The storeId from the SAME listing row — it lets the email resolve in any mailbox, not just the default one').optional();
+
+// Both tools leave the mailbox as it is; they only write a copy of the file to a
+// private scratch directory, which is why they count as reading tools.
+export function registerAttachmentTools({ server, bridge, add }: ToolContext): void {
+    add('save_outlook_attachment', 'read', () => server.registerTool('save_outlook_attachment', {
+        title: 'Save an Outlook attachment',
+        description: 'Save one attachment of an email to a private temporary directory and return the saved file\'s path. Pass the entry_id and store_id from the same listing row, and the file name exactly as the email\'s attachmentNames lists it.',
         inputSchema: z.object({
-            entry_id: z.string().describe('Outlook email EntryID (from list_outlook_inbox)'),
-            file_name: z.string().max(500).describe("Exact attachment filename to save (e.g. 'invoice.pdf')"),
-            store_id: z.string().describe('Outlook StoreID from the same list_outlook_inbox row — disambiguate the email across mailboxes').optional(),
+            entry_id: ENTRY_ID,
+            file_name: z.string().max(500).describe("The attachment's file name (e.g. 'invoice.pdf'), from the email's attachmentNames"),
+            store_id: STORE_ID,
         }),
-    }, safe(async ({ entry_id, file_name, store_id }) => {
-        const savedPath = await saveEmailAttachment(entry_id, file_name, store_id);
-        return text(savedPath);
-    }));
+        annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    }, toolHandler(async ({ entry_id, file_name, store_id }) => {
+        const saved = await bridge.saveEmailAttachment({ entryId: entry_id, storeId: store_id }, file_name);
+        return text(saved.path);
+    })));
 
-    server.registerTool('read_outlook_attachment', {
-        description: "Open an attachment on an Outlook email and return its contents. Pass the entry_id AND the store_id from the SAME list_outlook_inbox row (store_id disambiguate the email across mailboxes), plus the exact attachment file name (from that email's attachmentNames). Extracts text from PDF, Excel (.xlsx), and plain-text/CSV attachments. JPEG/PNG/GIF/WebP attachments (a scanned or screenshot document) are returned as an inline image alongside the metadata, so read it directly — there's no OCR step to ask for. Another image format, or one too large to inline, comes back as a note pointing at the saved path instead. The result also echoes the resolved email's subject + senderEmail: verify these match who you intended before relying on the numbers, since many replies in a thread share one subject and it's easy to pass a neighboring row's entry_id.",
+    add('read_outlook_attachment', 'read', () => server.registerTool('read_outlook_attachment', {
+        title: 'Read an Outlook attachment',
+        description:
+            "Open one attachment of an email and return its contents: the text of a PDF, a spreadsheet (.xlsx, one tab-separated row per line) or a text file; a JPEG, PNG, GIF or WebP image as an inline image to look at directly. Another format, or an image too large to inline, comes back as a note with the saved file's path. " +
+            'Pass the entry_id and store_id from the same listing row, and the file name from its attachmentNames. The result echoes the resolved email\'s subject and senderEmail: check they match the email you meant before relying on what you read, since replies in one thread share a subject.',
         inputSchema: z.object({
-            entry_id: z.string().describe('Outlook email EntryID (from list_outlook_inbox)'),
-            file_name: z.string().max(500).describe('Exact attachment filename to open (from the email\'s attachmentNames)'),
-            store_id: z.string().describe('Outlook StoreID from the same list_outlook_inbox row — disambiguate the email across mailboxes').optional(),
-            max_chars: z.number().int().min(500).max(100000).describe('Max characters of extracted text to return (default 20000)').default(20000),
+            entry_id: ENTRY_ID,
+            file_name: z.string().max(500).describe("The attachment's file name, from the email's attachmentNames"),
+            store_id: STORE_ID,
+            max_chars: z.number().int().min(500).max(200000).describe('Maximum characters of extracted text to return (default 20000)').default(20000),
         }),
-    }, safe(async ({ entry_id, file_name, store_id, max_chars }) => {
-        const saved = await saveEmailAttachmentDetailed(entry_id, file_name, store_id);
-        const extracted = await extractAttachmentText(saved.path);
-        const base = { file: saved.path, subject: saved.subject, senderEmail: saved.senderEmail, type: extracted.type };
+        annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    }, toolHandler(async ({ entry_id, file_name, store_id, max_chars }) => {
+        const saved = await bridge.saveEmailAttachment({ entryId: entry_id, storeId: store_id }, file_name);
+        const extracted = await extractAttachmentContent(saved.path);
+        const about = { file: saved.path, subject: saved.subject, senderEmail: saved.senderEmail };
 
-        if ('data' in extracted) {
+        if (extracted.type === 'image') {
             return contents(
-                { type: 'text', text: JSON.stringify({ ...base, mimeType: extracted.mimeType }, null, 2) },
-                extracted,
+                {
+                    type: 'text',
+                    text: JSON.stringify({ ...about, type: 'image', mimeType: extracted.mimeType }, null, 2)
+                },
+                { type: 'image', data: extracted.data, mimeType: extracted.mimeType },
             );
         }
-
         if (!extracted.text) {
-            return json({ ...base, text: '', note: extracted.note });
+            return json({ ...about, type: extracted.format, text: '', note: extracted.note });
         }
-
         const truncated = extracted.text.length > max_chars;
         return json({
-            ...base,
+            ...about,
+            type: extracted.format,
             chars: extracted.text.length,
             truncated,
             text: truncated ? extracted.text.slice(0, max_chars) : extracted.text,
         });
-    }));
+    })));
 }
