@@ -7,6 +7,8 @@ export const OUTLOOK_TOOL_NAMES = [
     'get_outlook_accounts',
     'list_outlook_inbox',
     'read_outlook_email_body',
+    'search_outlook_inbox',
+    'read_selected_outlook_email',
     'list_outlook_inbox_folders',
     'move_outlook_emails',
     'reply_outlook_email',
@@ -18,6 +20,7 @@ export const OUTLOOK_TOOL_NAMES = [
     'outlook_drafts',
     'send_all_drafts',
     'delete_outlook_emails',
+    'outlook_bounces',
 ] as const;
 
 export type OutlookToolName = typeof OUTLOOK_TOOL_NAMES[number];
@@ -32,7 +35,8 @@ export interface OutlookToolsOptions {
     bridge?: OutlookBridge;
     /**
      * Register only what leaves the mailbox unchanged: the reading tools, plus
-     * the 'list' actions of `outlook_templates` and `outlook_drafts`. Nothing
+     * the read actions of `outlook_templates`, `outlook_drafts` and
+     * `outlook_bounces`. Nothing
      * that sends, files, saves into or deletes from the mailbox is registered.
      */
     readOnly?: boolean;

@@ -50,24 +50,28 @@ tools.list_outlook_inbox?.disable(); // each registered tool is the SDK's handle
 
 ## Tools
 
-| Tool                         | Access       | What it does                                                                                                         |
-|------------------------------|--------------|----------------------------------------------------------------------------------------------------------------------|
-| `get_outlook_accounts`       | read         | The mailboxes the Outlook profile can reach.                                                                         |
-| `list_outlook_inbox`         | read         | Recent mail from the Inbox root or one folder (including Sent Items, Drafts, …), with previews and attachment names. |
-| `read_outlook_email_body`    | read         | One email's plain-text body, split from the quoted thread.                                                           |
-| `list_outlook_inbox_folders` | read         | The folders under the Inbox, with item counts.                                                                       |
-| `list_outlook_signatures`    | read         | The Outlook signature names on this machine.                                                                         |
-| `outlook_templates`          | read / write | Template emails in a mailbox folder: `list`, and `save` a new one.                                                   |
-| `save_outlook_attachment`    | read         | Save one attachment to a private temp directory; returns its path.                                                   |
-| `read_outlook_attachment`    | read         | An attachment's text (PDF, .xlsx, text files) or its image, inline.                                                  |
-| `outlook_drafts`             | read / write | The account's drafts: `list`, and `delete` or `send` chosen ones.                                                    |
-| `move_outlook_emails`        | write        | File emails into a folder — including Deleted Items, recoverably.                                                    |
-| `reply_outlook_email`        | write        | A threaded reply, from HTML or a template (section, placeholders, signature).                                        |
-| `send_outlook_email`         | write        | A new email: to/cc/bcc, attachments, sent or staged as a draft.                                                      |
-| `send_all_drafts`            | write        | Send every draft of an account.                                                                                      |
-| `delete_outlook_emails`      | write        | Delete mail by id (dry-run first; received and sent mail refused by default), or purge Deleted Items.                |
+| Tool                          | Access       | What it does                                                                                                         |
+|-------------------------------|--------------|----------------------------------------------------------------------------------------------------------------------|
+| `get_outlook_accounts`        | read         | The mailboxes the Outlook profile can reach.                                                                         |
+| `list_outlook_inbox`          | read         | Recent mail from the Inbox root or one folder (including Sent Items, Drafts, …), with previews and attachment names. |
+| `search_outlook_inbox`        | read         | The Inbox and every folder under it, by subject glob or regex, date window, attachments and folder.                  |
+| `read_outlook_email_body`     | read         | One email's plain-text body, split from the quoted thread.                                                           |
+| `read_selected_outlook_email` | read         | The email selected or open in Outlook, with its ids and its body split from the quoted thread.                       |
+| `list_outlook_inbox_folders`  | read         | The folders under the Inbox, with item counts.                                                                       |
+| `list_outlook_signatures`     | read         | The Outlook signature names on this machine.                                                                         |
+| `outlook_templates`           | read / write | Template emails in a mailbox folder: `list`, and `save` a new one.                                                   |
+| `save_outlook_attachment`     | read         | Save one attachment to a private temp directory; returns its path.                                                   |
+| `read_outlook_attachment`     | read         | An attachment's text (PDF, .xlsx, text files) or its image, inline.                                                  |
+| `outlook_drafts`              | read / write | The account's drafts: `list`, and `delete` or `send` chosen ones.                                                    |
+| `outlook_bounces`             | read / write | Bounce-backs: `list` them, `report` which sent messages bounced and for whom, `clean` them out.                      |
+| `move_outlook_emails`         | write        | File emails into a folder — including Deleted Items, recoverably.                                                    |
+| `reply_outlook_email`         | write        | A threaded reply, from HTML or a template (section, placeholders, signature).                                        |
+| `send_outlook_email`          | write        | A new email: to/cc/bcc, attachments, a signature, sent or staged as a draft.                                         |
+| `send_all_drafts`             | write        | Send every draft of an account.                                                                                      |
+| `delete_outlook_emails`       | write        | Delete mail by id (dry-run first; received and sent mail refused by default), or purge Deleted Items.                |
 
-With `readOnly`, the write tools aren't registered and `outlook_templates` / `outlook_drafts` offer only `list`.
+With `readOnly`, the write tools aren't registered, `outlook_templates` and `outlook_drafts` offer only `list`, and
+`outlook_bounces` only `list` and `report`.
 
 Every tool declares MCP annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) so a host can
 decide what needs confirmation, and a title for display. The descriptions tell the model the safety rules that matter —

@@ -6,6 +6,7 @@
 import * as outlook from '@dawnlit/outlook-bridge';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { registerAttachmentTools } from './attachments';
+import { registerBounceTools } from './bounces';
 import { registerCleanupTools } from './cleanup';
 import { registerComposeTools } from './compose';
 import { registerDraftTools } from './drafts';
@@ -46,5 +47,6 @@ export function registerOutlookTools(server: McpServer, options: OutlookToolsOpt
     registerAttachmentTools(context);
     registerDraftTools(context);
     registerCleanupTools(context);
+    registerBounceTools(context);
     return registered;
 }

@@ -38,7 +38,7 @@ export function registerComposeTools({ server, bridge, readOnly, add }: ToolCont
             template_folder: z.string().max(300).describe("Folder holding the template (default 'Templates')").default('Templates'),
             template_section: z.string().max(60).describe('Which [[SECTION]] of the template to keep; the others and every marker are removed. Required when the template has sections — the call fails rather than send a body with markers in it. outlook_templates reports each template\'s sections.').optional(),
             template_placeholders: z.record(z.string(), z.string().max(50000)).describe('{{PLACEHOLDER}} → HTML to substitute, e.g. {"QUESTIONS": "line one<br>line two"}. Fails if a named placeholder isn\'t in the template.').optional(),
-            signature: z.string().max(200).describe("Name of an Outlook signature (from list_outlook_signatures) to put in the template's {{SIGNATURE}} placeholder, images included. Required when the template has that placeholder.").optional(),
+            signature: z.string().max(200).describe("Name of an Outlook signature (from list_outlook_signatures), images included. It fills the body's {{SIGNATURE}} placeholder — required when a template has one — or otherwise goes below your text.").optional(),
             send_immediately: z.boolean().describe('true sends now; false (default) stages a draft').default(false),
             open_draft_window: z.boolean().describe('Drafts only: true (default) opens a compose window; false saves silently to Drafts — use false for batches').default(true),
         }),
@@ -78,6 +78,7 @@ export function registerComposeTools({ server, bridge, readOnly, add }: ToolCont
             html_body: z.string().max(200000).describe('HTML body'),
             attachment_path: z.string().max(1000).describe('Absolute path of one file to attach').optional(),
             attachment_paths: z.array(z.string().max(1000)).max(50).describe('Absolute paths of several files to attach').optional(),
+            signature: z.string().max(200).describe("Name of an Outlook signature (from list_outlook_signatures) to sign with, images included: in the body's {{SIGNATURE}} placeholder if it has one, otherwise at the end. Outlook adds no signature of its own to an email sent this way.").optional(),
             send_immediately: z.boolean().describe('true sends now; false (default) stages a draft').default(false),
             open_draft_window: z.boolean().describe('Drafts only: true (default) opens a compose window for review; false saves silently to Drafts — use false for batches').default(true),
         }),
@@ -91,6 +92,7 @@ export function registerComposeTools({ server, bridge, readOnly, add }: ToolCont
             subject: args.subject,
             htmlBody: args.html_body,
             attachments: [...(args.attachment_path ? [args.attachment_path] : []), ...(args.attachment_paths ?? [])],
+            signatureName: args.signature,
             sendImmediately: args.send_immediately,
             openDraftWindow: args.open_draft_window,
         });
@@ -100,9 +102,9 @@ export function registerComposeTools({ server, bridge, readOnly, add }: ToolCont
     add('list_outlook_signatures', 'read', () => server.registerTool('list_outlook_signatures', {
         title: 'List Outlook signatures',
         description:
-            "List the names of the Outlook signatures set up on this machine, for reply_outlook_email's `signature`. " +
+            "List the names of the Outlook signatures set up on this machine, for the `signature` of reply_outlook_email and send_outlook_email. " +
             'Exactly one name means use it; several means ASK THE USER which to sign with — signatures belong to the machine, not to an account, so never infer one from the sending address. ' +
-            'An empty list means no signature is set up: ask what to sign with rather than inventing a name. Names only — the signature itself is resolved when replying.',
+            'An empty list means no signature is set up: ask what to sign with rather than inventing a name. Names only — the signature itself is resolved when the email is composed.',
         inputSchema: z.object({}),
         annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     }, toolHandler(async () => {

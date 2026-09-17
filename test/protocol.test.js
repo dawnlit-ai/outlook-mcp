@@ -51,7 +51,7 @@ test('tools/list describes every tool with a title, annotations and an object sc
     const {request, close} = await connect({bridge});
     try {
         const {result} = await request('tools/list', {});
-        assert.equal(result.tools.length, 14);
+        assert.equal(result.tools.length, 17);
         for (const tool of result.tools) {
             assert.ok(tool.title, tool.name);
             assert.equal(typeof tool.annotations.readOnlyHint, 'boolean', tool.name);

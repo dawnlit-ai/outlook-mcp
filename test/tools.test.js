@@ -43,9 +43,13 @@ async function call(server, name, args = {}) {
 }
 
 const READ_ONLY_TOOLS = [
-    'get_outlook_accounts', 'list_outlook_inbox', 'read_outlook_email_body', 'list_outlook_inbox_folders',
-    'list_outlook_signatures', 'outlook_templates', 'save_outlook_attachment', 'read_outlook_attachment', 'outlook_drafts',
+    'get_outlook_accounts', 'list_outlook_inbox', 'read_outlook_email_body', 'search_outlook_inbox',
+    'read_selected_outlook_email', 'list_outlook_inbox_folders', 'list_outlook_signatures', 'outlook_templates',
+    'save_outlook_attachment', 'read_outlook_attachment', 'outlook_drafts', 'outlook_bounces',
 ];
+
+/** The tools with read AND write actions: read-only only when registered that way. */
+const MIXED_TOOLS = ['outlook_templates', 'outlook_drafts', 'outlook_bounces'];
 
 test('every tool registers by default, and the result names them', () => {
     const server = recordingServer();
@@ -70,8 +74,8 @@ test('annotations mark exactly the tools that change nothing as read-only', () =
     const server = recordingServer();
     registerOutlookTools(server, {bridge: fakeBridge()});
     const readOnly = [...server.tools].filter(([, {config}]) => config.annotations.readOnlyHint).map(([name]) => name);
-    assert.deepEqual(readOnly.sort(), READ_ONLY_TOOLS.filter(n => n !== 'outlook_templates' && n !== 'outlook_drafts').sort());
-    for (const name of ['delete_outlook_emails', 'send_all_drafts', 'outlook_drafts']) {
+    assert.deepEqual(readOnly.sort(), READ_ONLY_TOOLS.filter(n => !MIXED_TOOLS.includes(n)).sort());
+    for (const name of ['delete_outlook_emails', 'send_all_drafts', 'outlook_drafts', 'outlook_bounces']) {
         assert.equal(server.tools.get(name).config.annotations.destructiveHint, true, name);
     }
 });
@@ -80,14 +84,12 @@ test('readOnly registers only tools that leave the mailbox unchanged, and only t
     const server = recordingServer();
     registerOutlookTools(server, {bridge: fakeBridge(), readOnly: true});
     assert.deepEqual([...server.tools.keys()].sort(), [...READ_ONLY_TOOLS].sort());
-    for (const name of ['outlook_templates', 'outlook_drafts']) {
+    const writeAction = {outlook_templates: 'save', outlook_drafts: 'send', outlook_bounces: 'clean'};
+    for (const name of MIXED_TOOLS) {
         const {config} = server.tools.get(name);
         assert.equal(config.annotations.readOnlyHint, true, name);
-        assert.throws(() => config.inputSchema.parse({
-            action: name === 'outlook_drafts' ? 'send' : 'save',
-            email_account: 'a@b.com'
-        }), name);
-        assert.doesNotMatch(config.description, /'save' adds|'send' sends/);
+        assert.throws(() => config.inputSchema.parse({action: writeAction[name], email_account: 'a@b.com'}), name);
+        assert.doesNotMatch(config.description, /'save' adds|'send' sends|'clean' deletes/);
     }
 });
 
@@ -123,6 +125,107 @@ test('send_outlook_email merges both attachment parameters and passes bcc', asyn
     assert.deepEqual(params.attachments, ['/tmp/one.pdf', '/tmp/two.pdf']);
     assert.equal(params.bcc, 'z@y.com');
     assert.equal(result.content[0].text, 'Draft saved to the Outlook Drafts folder.');
+});
+
+test('send_outlook_email passes a signature name through for the bridge to resolve', async () => {
+    const server = recordingServer();
+    const bridge = fakeBridge();
+    registerOutlookTools(server, {bridge});
+    await call(server, 'send_outlook_email', {
+        email_account: 'a@b.com',
+        to: 'x@y.com',
+        subject: 's',
+        html_body: 'b',
+        signature: 'Work'
+    });
+    assert.equal(bridge.calls.at(-1).args[0].signatureName, 'Work');
+});
+
+function searchMatch(fields) {
+    return {
+        entryId: 'E', storeId: 'S', subject: 's', senderName: '', senderEmail: '', receivedTime: '',
+        body: '', attachmentNames: [], folderPath: '\\\\a@b.com\\Inbox', ...fields,
+    };
+}
+
+test('search_outlook_inbox maps its filter onto the bridge and returns the newest first, without bodies', async () => {
+    const server = recordingServer();
+    const bridge = fakeBridge({
+        searchInboxByFilter: [
+            searchMatch({entryId: 'OLD', receivedTime: '2026-09-01 09:00', body: 'old body'}),
+            searchMatch({entryId: 'NEW', receivedTime: '2026-09-03 09:00', body: 'new body'}),
+            searchMatch({entryId: 'MID', receivedTime: '2026-09-02 09:00', body: 'mid body'}),
+        ],
+    });
+    registerOutlookTools(server, {bridge});
+    const result = await call(server, 'search_outlook_inbox', {
+        email_account: 'a@b.com', subject: '*offer*', subject_regex: 'offer|quote', folders: ['Clients'], limit: 2,
+    });
+    const [account, filter] = bridge.calls.at(-1).args;
+    assert.equal(account, 'a@b.com');
+    assert.equal(filter.daysBack, 60);
+    assert.equal(filter.subjectLike, '*offer*');
+    assert.ok(filter.subjectPattern.test('A QUOTE'), 'the regex is case-insensitive');
+    assert.deepEqual(filter.includeFolders, ['Clients']);
+    assert.equal(filter.includeBody, false);
+    const payload = JSON.parse(result.content[0].text);
+    assert.equal(payload.count, 3);
+    assert.equal(payload.truncated, true);
+    assert.deepEqual(payload.matches.map(m => m.entryId), ['NEW', 'MID']);
+    assert.ok(!('body' in payload.matches[0]));
+});
+
+test('search_outlook_inbox caps bodies when asked for them, and refuses a regex that does not compile', async () => {
+    const server = recordingServer();
+    const bridge = fakeBridge({searchInboxByFilter: [searchMatch({body: 'x'.repeat(150)})]});
+    registerOutlookTools(server, {bridge});
+    const result = await call(server, 'search_outlook_inbox', {
+        email_account: 'a@b.com',
+        include_body: true,
+        max_body_chars: 100
+    });
+    const [match] = JSON.parse(result.content[0].text).matches;
+    assert.equal(match.body.length, 100);
+    assert.equal(match.bodyTruncated, true);
+    const bad = await call(server, 'search_outlook_inbox', {email_account: 'a@b.com', subject_regex: '(unclosed'});
+    assert.equal(bad.isError, true);
+    assert.match(bad.content[0].text, /^\[INVALID_REQUEST]/);
+});
+
+test('read_selected_outlook_email splits the new text from the quoted thread', async () => {
+    const server = recordingServer();
+    const bridge = fakeBridge({
+        readSelectedEmail: {
+            entryId: 'E1', storeId: 'S1', subject: 'RE: Offer', senderName: 'Jo', senderEmail: 'jo@x.com',
+            receivedTime: '2026-09-01 10:00', attachmentNames: ['a.pdf'],
+            body: 'Yes, confirmed.\n\n-----Original Message-----\nFrom: us\nCan you confirm?',
+        },
+    });
+    registerOutlookTools(server, {bridge});
+    const payload = JSON.parse((await call(server, 'read_selected_outlook_email')).content[0].text);
+    assert.equal(payload.entryId, 'E1');
+    assert.equal(payload.storeId, 'S1');
+    assert.equal(payload.body, 'Yes, confirmed.');
+    assert.ok(payload.quotedLength > 0);
+    assert.equal(payload.quotedOriginal, '');
+});
+
+test('outlook_bounces lists without changing anything, cleans only when asked, and reports sends', async () => {
+    const server = recordingServer();
+    const bridge = fakeBridge({cleanUndeliverableEmails: {matched: []}, readBounceReport: {sends: []}});
+    registerOutlookTools(server, {bridge});
+    await call(server, 'outlook_bounces', {action: 'list', email_account: 'a@b.com'});
+    assert.deepEqual(bridge.calls.at(-1), {
+        name: 'cleanUndeliverableEmails',
+        args: ['a@b.com', {daysBack: 30, dryRun: true}]
+    });
+    await call(server, 'outlook_bounces', {action: 'clean', email_account: 'a@b.com', days_back: 7});
+    assert.deepEqual(bridge.calls.at(-1), {
+        name: 'cleanUndeliverableEmails',
+        args: ['a@b.com', {daysBack: 7, dryRun: false}]
+    });
+    await call(server, 'outlook_bounces', {action: 'report', email_account: 'a@b.com'});
+    assert.deepEqual(bridge.calls.at(-1), {name: 'readBounceReport', args: ['a@b.com', {daysBack: 30}]});
 });
 
 test('a bridge failure comes back as an error result carrying its code', async () => {
