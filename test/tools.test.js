@@ -204,6 +204,17 @@ test('search_outlook_inbox caps bodies when asked for them, and refuses a regex 
     assert.match(bad.content[0].text, /^\[INVALID_REQUEST]/);
 });
 
+test('search_outlook_inbox reads subject_regex in Unicode mode, as .NET reads it on Windows', async () => {
+    const server = recordingServer();
+    const bridge = fakeBridge({searchInboxByFilter: []});
+    registerOutlookTools(server, {bridge});
+    await call(server, 'search_outlook_inbox', {email_account: 'a@b.com', subject_regex: '^\\p{L}'});
+    const [, filter] = bridge.calls.at(-1).args;
+    assert.ok(filter.subjectPattern.unicode, 'the u flag reaches the bridge, which keeps it on macOS');
+    assert.ok(filter.subjectPattern.test('Ärger mit der Lieferung'), '\\p{L} is a letter class, not the text "p{L}"');
+    assert.ok(!filter.subjectPattern.test('2026 invoice'));
+});
+
 test('read_selected_outlook_email splits the new text from the quoted thread', async () => {
     const server = recordingServer();
     const bridge = fakeBridge({

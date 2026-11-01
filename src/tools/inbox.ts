@@ -10,11 +10,15 @@ const EMAIL_ACCOUNT = z.string().describe('Outlook email account address (from g
 const ENTRY_ID = z.string().describe('The email\'s entryId, from the listing row that found it');
 const STORE_ID = z.string().describe('The storeId from the SAME listing row — it lets the email resolve in any mailbox, not just the default one').optional();
 
-/** A subject regex from a tool argument: case-insensitive, and INVALID_REQUEST when it doesn't compile. */
+/**
+ * A subject regex from a tool argument: case-insensitive, and INVALID_REQUEST when it doesn't compile.
+ * Unicode mode, because .NET reads `\p{L}` as a letter class with no flag at all, and JavaScript only
+ * with `u` — which the bridge keeps on macOS since 2.1 — so the pattern means the same on both.
+ */
 function subjectRegExp(source: string | undefined): RegExp | undefined {
     if (!source) return undefined;
     try {
-        return new RegExp(source, 'i');
+        return new RegExp(source, 'iu');
     } catch (error) {
         throw new InvalidRequestError(`subject_regex is not a valid regular expression: ${(error as Error).message}`);
     }
@@ -99,7 +103,7 @@ export function registerInboxTools({ server, bridge, add }: ToolContext): void {
             email_account: EMAIL_ACCOUNT,
             days_back: z.number().int().min(1).max(3650).describe('How many days back to search (default 60). The whole tree is walked, so a wide window on a big mailbox is slow.').default(60),
             subject: z.string().max(300).describe("Subject glob, case-insensitive: `*` matches any run and `?` one character, so '*invoice*' is any subject containing it. Without a `*` the whole subject has to match.").optional(),
-            subject_regex: z.string().max(500).describe("A regular expression tested against each subject, case-insensitively, for what a glob can't say ('quote|estimate'). Keep to syntax JavaScript and .NET share.").optional(),
+            subject_regex: z.string().max(500).describe("A regular expression tested against each subject, case-insensitively, for what a glob can't say ('quote|estimate'). Read in Unicode mode, so \\p{L}-style classes work on Windows and macOS alike; keep to syntax JavaScript and .NET share.").optional(),
             exclude_replies: z.boolean().describe('Leave out subjects that start with a reply or forward prefix (RE:, FW:, AW:, 回复:, …). Default false.').default(false),
             with_attachments: z.boolean().describe('Only mail with at least one attachment. Default false.').default(false),
             folders: z.array(z.string().max(300)).max(100).describe("Search only these folders, by bare name or the folderPath list_outlook_inbox_folders prints, case-insensitively. Matched exactly: naming a folder doesn't bring its subfolders, and the Inbox itself is searched only when named. Omit to search everything.").optional(),
