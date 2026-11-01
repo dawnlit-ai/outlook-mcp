@@ -65,7 +65,7 @@ tools.list_outlook_inbox?.disable(); // each registered tool is the SDK's handle
 | `list_outlook_inbox`          | read         | Recent mail from the Inbox root or one folder (including Sent Items, Drafts, …), with previews and attachment names. |
 | `search_outlook_inbox`        | read         | The Inbox and every folder under it, by subject glob or regex, date window, attachments and folder.                  |
 | `read_outlook_email_body`     | read         | One email's plain-text body, split from the quoted thread.                                                           |
-| `read_selected_outlook_email` | read         | The email selected or open in Outlook, with its ids and its body split from the quoted thread.                       |
+| `read_selected_outlook_email` | read         | The email selected or open in Outlook, with its ids, its folder, and its body split from the quoted thread.          |
 | `list_outlook_inbox_folders`  | read         | The folders under the Inbox, with item counts.                                                                       |
 | `list_outlook_signatures`     | read         | The Outlook signature names on this machine.                                                                         |
 | `outlook_templates`           | read / write | Template emails in a mailbox folder: `list`, and `save` a new one.                                                   |
@@ -75,7 +75,7 @@ tools.list_outlook_inbox?.disable(); // each registered tool is the SDK's handle
 | `outlook_bounces`             | read / write | Bounce-backs: `list` them, `report` which sent messages bounced and for whom, `clean` them out.                      |
 | `move_outlook_emails`         | write        | File emails into a folder — including Deleted Items, recoverably.                                                    |
 | `reply_outlook_email`         | write        | A threaded reply, from HTML or a template (section, placeholders, signature).                                        |
-| `send_outlook_email`          | write        | A new email: to/cc/bcc, attachments, a signature, sent or staged as a draft.                                         |
+| `send_outlook_email`          | write        | A new email: to/cc/bcc, attachments, a signature, sent or staged as a draft (a silent draft reports its id).         |
 | `send_all_drafts`             | write        | Send every draft of an account.                                                                                      |
 | `delete_outlook_emails`       | write        | Delete mail by id (dry-run first; received and sent mail refused by default), or purge Deleted Items.                |
 
