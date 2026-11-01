@@ -48,7 +48,7 @@
     "prepare": "npm run build"
   },
   "dependencies": {
-    "@dawnlit/outlook-bridge": "^2.0.0",
+    "@dawnlit/outlook-bridge": "^2.1.0",
     "exceljs": "^4.4.0",
     "pdf-parse": "^2.4.5"
   },

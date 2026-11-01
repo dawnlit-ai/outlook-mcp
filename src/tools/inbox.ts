@@ -133,7 +133,7 @@ export function registerInboxTools({ server, bridge, add }: ToolContext): void {
         title: 'Read the selected Outlook email',
         description:
             "Read the email the user has selected, or has open, in Outlook on this machine — for 'this email' or 'the one I have open'. No account or id needed. " +
-            "Returns its entryId and storeId (pass both to the other tools to act on it), subject, sender, receivedTime, attachment NAMES, and the sender's own text with the quoted thread split off. " +
+            "Returns its entryId and storeId (pass both to the other tools to act on it), the folderPath it sits in — whose first segment names its mailbox — subject, sender, receivedTime, attachment NAMES, and the sender's own text with the quoted thread split off. " +
             'Fails if nothing is selected or the selection is not an email.',
         inputSchema: z.object({
             max_chars: z.number().int().min(500).max(100000).describe('Cap on the returned body (default 8000); `truncated` and `bodyLength` report when it bit').default(8000),
@@ -151,6 +151,7 @@ export function registerInboxTools({ server, bridge, add }: ToolContext): void {
             senderEmail: email.senderEmail,
             receivedTime: email.receivedTime,
             attachmentNames: email.attachmentNames,
+            folderPath: email.folderPath,
             body: body.slice(0, max_chars),
             truncated: body.length > max_chars,
             bodyLength: body.length,

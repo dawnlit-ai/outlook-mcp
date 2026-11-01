@@ -68,6 +68,7 @@ export function registerComposeTools({ server, bridge, readOnly, add }: ToolCont
         description:
             'Send a new email through Outlook, or stage it as a draft. IMPORTANT: before calling, show the user a preview (recipients, subject, a body summary, attachments) and get their confirmation; set send_immediately only when they explicitly ask to send without review. ' +
             'With send_immediately false (the default) the email is a DRAFT: it opens in a compose window, or — with open_draft_window false — is saved silently to Drafts, the right choice for a batch. ' +
+            "A draft saved silently reports its entryId: keep the ids of a batch, and send or delete exactly those with outlook_drafts rather than send_all_drafts, which sends whatever is in Drafts. " +
             'To answer an email you have read, use reply_outlook_email instead.',
         inputSchema: z.object({
             email_account: z.string().describe('Outlook email account address to send from'),
@@ -84,7 +85,7 @@ export function registerComposeTools({ server, bridge, readOnly, add }: ToolCont
         }),
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     }, toolHandler(async (args) => {
-        await bridge.sendOutlookEmail({
+        const { draftEntryId } = await bridge.sendOutlookEmail({
             emailAccount: args.email_account,
             to: args.to,
             cc: args.cc,
@@ -96,7 +97,11 @@ export function registerComposeTools({ server, bridge, readOnly, add }: ToolCont
             sendImmediately: args.send_immediately,
             openDraftWindow: args.open_draft_window,
         });
-        return text(sendStatus(args.send_immediately, args.open_draft_window));
+        const status = sendStatus(args.send_immediately, args.open_draft_window);
+        // '' when the email was sent or opened in a window, which files nothing yet.
+        return text(draftEntryId
+            ? `${status} Its entryId is ${draftEntryId} — pass it to outlook_drafts to send or delete exactly this draft.`
+            : status);
     })));
 
     add('list_outlook_signatures', 'read', () => server.registerTool('list_outlook_signatures', {

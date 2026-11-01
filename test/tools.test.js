@@ -115,7 +115,7 @@ test('list_outlook_inbox maps its arguments onto the bridge, defaults included',
 
 test('send_outlook_email merges both attachment parameters and passes bcc', async () => {
     const server = recordingServer();
-    const bridge = fakeBridge();
+    const bridge = fakeBridge({sendOutlookEmail: {draftEntryId: ''}});
     registerOutlookTools(server, {bridge});
     const result = await call(server, 'send_outlook_email', {
         email_account: 'a@b.com', to: 'x@y.com', bcc: 'z@y.com', subject: 's', html_body: 'b',
@@ -124,12 +124,24 @@ test('send_outlook_email merges both attachment parameters and passes bcc', asyn
     const [params] = bridge.calls.at(-1).args;
     assert.deepEqual(params.attachments, ['/tmp/one.pdf', '/tmp/two.pdf']);
     assert.equal(params.bcc, 'z@y.com');
-    assert.equal(result.content[0].text, 'Draft saved to the Outlook Drafts folder.');
+    assert.equal(result.content[0].text, 'Draft saved to the Outlook Drafts folder.', 'no id, no id sentence');
+});
+
+test('send_outlook_email reports the id of a draft it saved silently', async () => {
+    const server = recordingServer();
+    registerOutlookTools(server, {bridge: fakeBridge({sendOutlookEmail: {draftEntryId: 'D1'}})});
+    const result = await call(server, 'send_outlook_email', {
+        email_account: 'a@b.com', to: 'x@y.com', subject: 's', html_body: 'b', open_draft_window: false,
+    });
+    assert.equal(
+        result.content[0].text,
+        'Draft saved to the Outlook Drafts folder. Its entryId is D1 — pass it to outlook_drafts to send or delete exactly this draft.',
+    );
 });
 
 test('send_outlook_email passes a signature name through for the bridge to resolve', async () => {
     const server = recordingServer();
-    const bridge = fakeBridge();
+    const bridge = fakeBridge({sendOutlookEmail: {draftEntryId: ''}});
     registerOutlookTools(server, {bridge});
     await call(server, 'send_outlook_email', {
         email_account: 'a@b.com',
@@ -198,6 +210,7 @@ test('read_selected_outlook_email splits the new text from the quoted thread', a
         readSelectedEmail: {
             entryId: 'E1', storeId: 'S1', subject: 'RE: Offer', senderName: 'Jo', senderEmail: 'jo@x.com',
             receivedTime: '2026-09-01 10:00', attachmentNames: ['a.pdf'],
+            folderPath: '\\\\team@x.com\\[Gmail]\\Drafts',
             body: 'Yes, confirmed.\n\n-----Original Message-----\nFrom: us\nCan you confirm?',
         },
     });
@@ -205,6 +218,7 @@ test('read_selected_outlook_email splits the new text from the quoted thread', a
     const payload = JSON.parse((await call(server, 'read_selected_outlook_email')).content[0].text);
     assert.equal(payload.entryId, 'E1');
     assert.equal(payload.storeId, 'S1');
+    assert.equal(payload.folderPath, '\\\\team@x.com\\[Gmail]\\Drafts', 'the folder names the mailbox to act as');
     assert.equal(payload.body, 'Yes, confirmed.');
     assert.ok(payload.quotedLength > 0);
     assert.equal(payload.quotedOriginal, '');
