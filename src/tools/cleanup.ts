@@ -11,7 +11,7 @@ export function registerCleanupTools({ server, bridge, add }: ToolContext): void
         description:
             '⚠️ DESTRUCTIVE. Delete mail by entryId from anywhere in an account, or permanently empty Deleted Items. ' +
             "REACH FOR SOMETHING ELSE FIRST: move_outlook_emails to 'Deleted Items' gets mail out of the way recoverably, and outlook_drafts (action 'delete') retracts drafts behind a gate that can touch nothing else. " +
-            "action 'delete' moves items to Deleted Items (recoverable) and refuses anything in the Inbox or Sent Items — INCLUDING their subfolders, since filed mail is still received mail — unless `allow_protected` is set. " +
+            "action 'delete' moves items to Deleted Items (recoverable) and refuses anything in the Inbox or Sent Items — INCLUDING their subfolders, since filed mail is still received mail — unless `allow_protected` is set. An id that resolves to mail in a DIFFERENT mailbox is always refused, whatever `allow_protected` says. " +
             '⭐ ALWAYS run with `dry_run: true` first: it resolves every id and reports the subject and folder it landed on WITHOUT deleting. An entryId is an unsafe key — a stale or wrong id can resolve to a DIFFERENT email, which is easy to do when replies share a subject. Show the user the dry-run output and get their confirmation before the real call. ' +
             "action 'purge_deleted_items' PERMANENTLY destroys the contents of Deleted Items — nothing recovers from it. It can only ever destroy what was already thrown away, and supports `dry_run` too.",
         inputSchema: z.object({

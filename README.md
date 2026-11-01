@@ -17,10 +17,10 @@ npm install @dawnlit/outlook-mcp @modelcontextprotocol/server zod
 dependencies, so the tools register on the same SDK your server already uses.
 
 If your own code imports the bridge — to pass a configured `bridge`, as under [Options](#options) — install it
-yourself, at the same major version:
+yourself, at a version this package accepts:
 
 ```bash
-npm install @dawnlit/outlook-bridge@^2
+npm install @dawnlit/outlook-bridge@^2.1
 ```
 
 npm's hoisting would find it anyway, but pnpm and Yarn Plug'n'Play refuse to import a package you haven't declared.
