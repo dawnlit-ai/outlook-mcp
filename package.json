@@ -1,6 +1,6 @@
 {
   "name": "@dawnlit/outlook-mcp",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "MCP tools for @dawnlit/outlook-bridge — let any MCP host read, search, send, reply to, file and template mail through the real Outlook client.",
   "license": "Apache-2.0",
   "author": "Dawnlit",
