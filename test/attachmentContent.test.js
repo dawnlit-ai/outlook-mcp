@@ -1,21 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
 const ExcelJS = require('exceljs');
 
 const {extractAttachmentContent} = require('../dist/attachmentContent.js');
-
-function tempPath(name) {
-    return path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'outlook-mcp-test-')), name);
-}
-
-function writeTemp(name, contents) {
-    const file = tempPath(name);
-    fs.writeFileSync(file, contents);
-    return file;
-}
+const {tempPath, writeTemp} = require('./support');
 
 test('a plain-text attachment is read verbatim', async () => {
     const result = await extractAttachmentContent(writeTemp('note.txt', 'line one\nline two'));

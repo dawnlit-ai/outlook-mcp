@@ -4,9 +4,7 @@ import { z } from 'zod';
 import { extractAttachmentContent } from '../attachmentContent';
 import { contents, json, text, toolHandler } from '../results';
 import type { ToolContext } from './context';
-
-const ENTRY_ID = z.string().describe('The email\'s entryId, from the listing row that found it');
-const STORE_ID = z.string().describe('The storeId from the SAME listing row — it lets the email resolve in any mailbox, not just the default one').optional();
+import { ENTRY_ID, STORE_ID } from './params';
 
 // Both tools leave the mailbox as it is; they only write a copy of the file to a
 // private scratch directory, which is why they count as reading tools.

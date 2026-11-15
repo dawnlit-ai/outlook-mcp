@@ -5,10 +5,9 @@ import { z } from 'zod';
 import { type InboxSearchMatch, InvalidRequestError, splitQuotedOriginal } from '@dawnlit/outlook-bridge';
 import { json, toolHandler } from '../results';
 import type { ToolContext } from './context';
+import { ENTRY_ID, STORE_ID } from './params';
 
 const EMAIL_ACCOUNT = z.string().describe('Outlook email account address (from get_outlook_accounts)');
-const ENTRY_ID = z.string().describe('The email\'s entryId, from the listing row that found it');
-const STORE_ID = z.string().describe('The storeId from the SAME listing row — it lets the email resolve in any mailbox, not just the default one').optional();
 
 /**
  * A subject regex from a tool argument: case-insensitive, and INVALID_REQUEST when it doesn't compile.

@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 
 const {registerOutlookTools, OUTLOOK_TOOL_NAMES} = require('../dist/index.js');
 const {NotFoundError, AccountNotFoundError} = require('@dawnlit/outlook-bridge');
+const {writeTemp} = require('./support');
 
 /** Records registerTool calls the way McpServer receives them. */
 function recordingServer() {
@@ -305,11 +306,7 @@ test('reply_outlook_email needs a body or a template', async () => {
 });
 
 test('read_outlook_attachment returns an image as an image block beside its metadata', async () => {
-    const fs = require('node:fs');
-    const os = require('node:os');
-    const path = require('node:path');
-    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'outlook-mcp-test-')), 'scan.png');
-    fs.writeFileSync(file, 'png bytes');
+    const file = writeTemp('scan.png', 'png bytes');
     const server = recordingServer();
     const bridge = fakeBridge({
         saveEmailAttachment: {

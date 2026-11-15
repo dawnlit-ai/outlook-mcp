@@ -36,8 +36,8 @@ export interface OutlookToolsOptions {
     /**
      * Register only what leaves the mailbox unchanged: the reading tools, plus
      * the read actions of `outlook_templates`, `outlook_drafts` and
-     * `outlook_bounces`. Nothing
-     * that sends, files, saves into or deletes from the mailbox is registered.
+     * `outlook_bounces`. Nothing that sends, files, saves into or deletes from
+     * the mailbox is registered.
      */
     readOnly?: boolean;
     /** Tools to leave out, by name. An unknown name throws, so a typo can't silently register a tool. */
@@ -48,7 +48,7 @@ export interface OutlookToolsOptions {
 export type RegisteredOutlookTools = Partial<Record<OutlookToolName, RegisteredTool>>;
 
 /** Whether a tool can change the mailbox or send mail. */
-export type ToolAccess = 'read' | 'write';
+type ToolAccess = 'read' | 'write';
 
 export interface ToolContext {
     readonly server: McpServer;
