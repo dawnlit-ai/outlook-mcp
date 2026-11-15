@@ -99,7 +99,8 @@ running your server, or the terminal or editor it was started from.
 ## Also exported
 
 - `extractAttachmentContent(path)` — the file reading behind `read_outlook_attachment`: text from PDF, .xlsx and text
-  formats, or an image's bytes for an image block.
+  formats, or an image's bytes for an image block. It resolves to an `ExtractedAttachment` — an `ExtractedText` or an
+  `ExtractedImage`, all three exported as types — and an image over `MAX_IMAGE_BYTES` comes back as a note, not bytes.
 - `readPdfText(path)`, `readXlsxText(path)` — the two extractors on their own. `readPdfText` is also available as
   `@dawnlit/outlook-mcp/pdf`, which loads nothing else.
 - `OUTLOOK_TOOL_NAMES` and the `OutlookToolName`, `OutlookToolsOptions` and `RegisteredOutlookTools` types.
