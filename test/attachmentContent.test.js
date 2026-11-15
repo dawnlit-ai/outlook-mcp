@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const ExcelJS = require('exceljs');
 
 const {extractAttachmentContent} = require('../dist/attachmentContent.js');
-const {tempPath, writeTemp} = require('./support');
+const {tempPath, writeTemp, pdfBytes} = require('./support');
 
 test('a plain-text attachment is read verbatim', async () => {
     const result = await extractAttachmentContent(writeTemp('note.txt', 'line one\nline two'));
@@ -45,6 +45,27 @@ test('a sparse spreadsheet row keeps each value under its own column', async () 
     const result = await extractAttachmentContent(file);
     assert.equal(result.format, 'xlsx');
     assert.equal(result.text, '# Prices\nItem\tSmall\tLarge\tNotes\nWidget\t\t\ton request');
+});
+
+test("a PDF's text is read, each page closed by its marker", async () => {
+    const result = await extractAttachmentContent(writeTemp('offer.pdf', pdfBytes(['First page', 'Second page'])));
+    assert.equal(result.type, 'text');
+    assert.equal(result.format, 'pdf');
+    assert.match(result.text, /First page\s+-- 1 of 2 --\s+Second page\s+-- 2 of 2 --/);
+});
+
+test('a PDF with no text layer is reported as a scan, not returned as its page markers', async () => {
+    const result = await extractAttachmentContent(writeTemp('scan.pdf', pdfBytes(['', ''])));
+    assert.equal(result.type, 'text');
+    assert.equal(result.format, 'pdf');
+    assert.equal(result.text, '', 'two bare markers are not text');
+    assert.match(result.note, /no text layer/);
+});
+
+test('a PDF with one readable page among scanned ones is still read', async () => {
+    const result = await extractAttachmentContent(writeTemp('mixed.pdf', pdfBytes(['', 'Signed on page two'])));
+    assert.match(result.text, /-- 1 of 2 --\s+Signed on page two/);
+    assert.equal(result.note, undefined);
 });
 
 test('an image format image blocks cannot carry is reported, not sent', async () => {
