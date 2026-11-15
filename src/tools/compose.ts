@@ -28,7 +28,8 @@ export function registerComposeTools({ server, bridge, readOnly, add }: ToolCont
             "Reply to one email (by entry_id): a TRUE reply — your html_body above the quoted original, recipients and subject taken from the original, threaded in the recipient's mailbox. Prefer it to send_outlook_email whenever answering an email you've read. " +
             'Pass the store_id from the SAME listing row, and check the echoed repliedToSender is who you meant. ' +
             'For a templated reply, pass template_subject instead of html_body: the template\'s body, section, placeholders and signature are resolved here, so the template\'s HTML never passes through this call. ' +
-            'IMPORTANT: preview the reply with the user before calling unless they approved a batch. send_immediately false + open_draft_window false saves a draft silently — the right choice for batches.',
+            'IMPORTANT: preview the reply with the user before calling unless they approved a batch. send_immediately false + open_draft_window false saves a draft silently — the right choice for batches. ' +
+            'A reply saved silently reports its draftEntryId (empty when the reply was sent or opened in a window): keep the ids of a batch, and send or delete exactly those with outlook_drafts rather than send_all_drafts, which sends whatever is in Drafts.',
         inputSchema: z.object({
             email_account: z.string().describe('Outlook email account address to reply as'),
             entry_id: z.string().describe('entryId of the email being replied to'),

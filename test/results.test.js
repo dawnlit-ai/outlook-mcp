@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {text, json, errorResult, toolHandler} = require('../dist/results.js');
-const {InvalidRequestError} = require('@dawnlit/outlook-bridge');
+const {InvalidRequestError, PermissionDeniedError} = require('@dawnlit/outlook-bridge');
 
 test('text() wraps a string as one text block', () => {
     assert.deepEqual(text('hello'), {content: [{type: 'text', text: 'hello'}]});
@@ -17,6 +17,11 @@ test('errorResult sets isError and leads with the error code', () => {
         isError: true,
         content: [{type: 'text', text: '[INVALID_REQUEST] bad'}],
     });
+    assert.equal(
+        errorResult(new PermissionDeniedError('Give Terminal Full Disk Access.')).content[0].text,
+        '[PERMISSION_DENIED] Give Terminal Full Disk Access.',
+        'a code the bridge added in 2.2 leads its message like any other',
+    );
     assert.deepEqual(errorResult(new Error('plain')), {isError: true, content: [{type: 'text', text: 'plain'}]});
     assert.deepEqual(errorResult('thrown string'), {isError: true, content: [{type: 'text', text: 'thrown string'}]});
 });

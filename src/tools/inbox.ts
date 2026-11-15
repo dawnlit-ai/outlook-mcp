@@ -97,7 +97,7 @@ export function registerInboxTools({ server, bridge, add }: ToolContext): void {
         title: 'Search Outlook mail',
         description:
             "Search an account's Inbox AND every folder under it by subject, date window, attachments and folder — where list_outlook_inbox reads one folder at a time. " +
-            'Use it whenever mail may already be filed into subfolders, or to find every message of a thread wherever it now sits. Sent Items, Drafts, Deleted Items and Junk are never searched. ' +
+            'Use it whenever mail may already be filed into subfolders, or to find every message of a thread wherever it now sits. Sent Items, Drafts, Deleted Items, Junk and the Outbox are never searched. ' +
             'Returns matches newest first with entryId, storeId, subject, sender, receivedTime, attachment NAMES and folderPath; bodies only when asked for. `count` is how many matched in all.',
         inputSchema: z.object({
             email_account: EMAIL_ACCOUNT,
@@ -182,6 +182,7 @@ export function registerInboxTools({ server, bridge, add }: ToolContext): void {
         description:
             "Move emails (by entryId) into a folder of the account — how processed mail gets filed. ⭐ Moving to 'Deleted Items' is also the right way to get an email out of the way: it stays recoverable there, so prefer it to delete_outlook_emails for anything but a draft. " +
             'IMPORTANT: moving someone\'s mail is a visible bulk action — find the destination with list_outlook_inbox_folders, tell the user exactly what would move where, and get their confirmation BEFORE calling. ' +
+            'Only the account\'s own mail is moved: an id that resolves to mail in a DIFFERENT mailbox stays where it is and comes back as that email\'s failure. ' +
             'Moving changes each email\'s entryId, so ids saved earlier are stale afterwards. Returns the resolved folderPath, whether it was created, the count moved, and any per-email failures.',
         inputSchema: z.object({
             email_account: EMAIL_ACCOUNT,

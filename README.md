@@ -20,7 +20,7 @@ If your own code imports the bridge — to pass a configured `bridge`, as under 
 yourself, at a version this package accepts:
 
 ```bash
-npm install @dawnlit/outlook-bridge@^2.1
+npm install @dawnlit/outlook-bridge@^2.2
 ```
 
 npm's hoisting would find it anyway, but pnpm and Yarn Plug'n'Play refuse to import a package you haven't declared.
@@ -74,7 +74,7 @@ tools.list_outlook_inbox?.disable(); // each registered tool is the SDK's handle
 | `outlook_drafts`              | read / write | The account's drafts: `list`, and `delete` or `send` chosen ones.                                                    |
 | `outlook_bounces`             | read / write | Bounce-backs: `list` them, `report` which sent messages bounced and for whom, `clean` them out.                      |
 | `move_outlook_emails`         | write        | File emails into a folder — including Deleted Items, recoverably.                                                    |
-| `reply_outlook_email`         | write        | A threaded reply, from HTML or a template (section, placeholders, signature).                                        |
+| `reply_outlook_email`         | write        | A threaded reply, from HTML or a template (section, placeholders, signature); a silent draft reports its id.         |
 | `send_outlook_email`          | write        | A new email: to/cc/bcc, attachments, a signature, sent or staged as a draft (a silent draft reports its id).         |
 | `send_all_drafts`             | write        | Send every draft of an account.                                                                                      |
 | `delete_outlook_emails`       | write        | Delete mail by id (dry-run first; received and sent mail refused by default), or purge Deleted Items.                |
@@ -91,6 +91,10 @@ preview before sending, dry-run before deleting, confirm before bulk actions.
 A failed call returns a tool result with `isError: true`, its text led by the bridge's error code —
 `[ACCOUNT_NOT_FOUND] …`, `[NOT_FOUND] Folder 'Invoices' not found. …`, `[INVALID_REQUEST] …` — so a model can act on the
 kind of failure rather than parse its wording.
+
+On a Mac, `[PERMISSION_DENIED] …` means macOS kept the bridge from Outlook's profile, the only place a Microsoft 365
+mailbox synced through Microsoft's cloud is listed. The message names the app to give **Full Disk Access** — the one
+running your server, or the terminal or editor it was started from.
 
 ## Also exported
 

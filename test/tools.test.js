@@ -279,6 +279,24 @@ test('an action missing its ids fails as INVALID_REQUEST without reaching the br
     assert.equal(bridge.calls.length, 0);
 });
 
+test('reply_outlook_email reports the id of a reply it saved silently', async () => {
+    const server = recordingServer();
+    const bridge = fakeBridge({
+        replyOutlookEmail: {to: 'jo@x.com', subject: 'RE: Offer', repliedToSender: 'jo@x.com', draftEntryId: 'D1'},
+    });
+    registerOutlookTools(server, {bridge});
+    const result = await call(server, 'reply_outlook_email', {
+        email_account: 'a@b.com', entry_id: 'E1', html_body: 'b', open_draft_window: false,
+    });
+    const [params] = bridge.calls.at(-1).args;
+    assert.equal(params.sendImmediately, false);
+    assert.equal(params.openDraftWindow, false);
+    const payload = JSON.parse(result.content[0].text);
+    assert.equal(payload.draftEntryId, 'D1', 'the id outlook_drafts takes');
+    assert.equal(payload.status, 'draft saved silently to the Drafts folder');
+    assert.match(server.tools.get('reply_outlook_email').config.description, /draftEntryId/);
+});
+
 test('reply_outlook_email needs a body or a template', async () => {
     const server = recordingServer();
     registerOutlookTools(server, {bridge: fakeBridge()});
